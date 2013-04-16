@@ -2,6 +2,7 @@ module Magic (getBinOp, getUnOp) where
 
 import Value
 import Language.Python.Common.AST
+import Language.Python.Common.PrettyAST ()
 import Language.Python.Common.Pretty (pretty, render)
 
 getBinOp :: Op annot -> Either String (Value -> Value -> Either String Value)

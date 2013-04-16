@@ -1,13 +1,19 @@
+module Interpreter (evalExpr) where
+
 import Language.Python.Version3.Parser (parseExpr)
 import Language.Python.Common.AST
 import Language.Python.Common.PrettyAST ()
 import Language.Python.Common.Pretty (pretty)
+
+import Control.Monad (liftM2)
+import Data.List (foldl1')
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 import Text.PrettyPrint (render)
 
 import Value
 import Magic
+import StringParser
 
 type Env = Map.Map String Value
 
@@ -18,7 +24,8 @@ evalExpr e i@Int{}     = Right . VInt $ int_value i
 evalExpr e i@LongInt{} = Right . VInt $ int_value i
 evalExpr e b@Bool{}    = Right . VBool $ bool_value b
 evalExpr e None{}      = Right VNone
-evalExpr e s@Strings{} = Right . VStr . concat $ strings_strings s
+evalExpr e s@Strings{} = foldl1' (liftM2 (++)) vals >>= return . VStr
+  where vals = map parseString $ strings_strings s
 evalExpr e var@Var{}   = maybe err Right $ Map.lookup str e
   where str = ident_string . var_ident $ var
         err = Left $ "The variable " ++ str ++ " is not defined."

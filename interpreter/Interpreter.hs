@@ -1,6 +1,6 @@
 module Interpreter (evalExpr) where
 
-import Control.Monad (liftM2)
+import Control.Monad (liftM, liftM2)
 import Data.List (foldl1')
 import Data.Map (Map)
 import qualified Data.Map as Map
@@ -22,8 +22,8 @@ evalExpr e i@Int{}     = Right . VInt $ int_value i
 evalExpr e i@LongInt{} = Right . VInt $ int_value i
 evalExpr e b@Bool{}    = Right . VBool $ bool_value b
 evalExpr e None{}      = Right VNone
-evalExpr e s@Strings{} = foldl1' (liftM2 (++)) vals >>= return . VStr
-  where vals = map parseString $ strings_strings s
+evalExpr e s@Strings{} = VStr `liftM` foldl1' (liftM2 (++)) strs
+  where strs = map parseString $ strings_strings s
 evalExpr e var@Var{}   = maybe err Right $ Map.lookup str e
   where str = ident_string . var_ident $ var
         err = Left $ "The variable " ++ str ++ " is not defined."

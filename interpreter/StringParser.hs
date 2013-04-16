@@ -1,6 +1,7 @@
 module StringParser (parseString) where
 
 import Control.Applicative ((<*))
+import Control.Monad (liftM)
 import Data.Maybe (catMaybes)
 import Text.Parsec
 
@@ -18,13 +19,13 @@ parseStr = quotedEscaped (str "\"\"\"")
        <|> quotedEscaped (str "\"")
        <|> quotedEscaped (str "'")
   where quotedEscaped quotes = quoted quotes (parseEscapedString quotes) <* eof
-        quoted quotes parser = between quotes quotes parser
+        quoted quotes = between quotes quotes
 
 parseRawString :: Parser String
 parseRawString = undefined
 
 parseEscapedString :: Parser String -> Parser String
-parseEscapedString quotes = manyTill parseEscapedChar (lookAhead quotes) >>= return . catMaybes
+parseEscapedString quotes = catMaybes `liftM` manyTill parseEscapedChar (lookAhead quotes)
 
 parseEscapedChar :: Parser (Maybe Char)
 parseEscapedChar = (str "\\\n" >> return Nothing)

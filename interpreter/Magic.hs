@@ -55,10 +55,8 @@ __mul__ v1@(VBool b1) = bool__mul__
 
 operandTypeError :: String -> Value -> Value -> String
 operandTypeError op v1 v2 = "TypeError: unsupported operand type(s) for "
-                            ++ op ++ ": "
-                            ++ "'" ++ typeName v1 ++ "'"
-                            ++ " and "
-                            ++ "'" ++ typeName v2 ++ "'"
+                            ++ op ++ ": " ++ name v1 ++ " and " ++ name v2
+  where name v = "'" ++ typeName v ++ "'"
                 
 __neg__ :: Value -> Either String Value
 __neg__ (VInt i) = Right . VInt $ -i

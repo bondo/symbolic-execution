@@ -3,7 +3,6 @@ module StringParser (parseString) where
 import Control.Applicative ((<*))
 import Data.Maybe (catMaybes)
 import Text.Parsec
-import Text.Parsec.Error (errorMessages, messageString)
 
 type Parser = Parsec String ()
 

@@ -1,21 +1,19 @@
 module Interpreter (evalExpr) where
 
-import Language.Python.Version3.Parser (parseExpr)
-import Language.Python.Common.AST
-import Language.Python.Common.PrettyAST ()
-import Language.Python.Common.Pretty (pretty)
-
 import Control.Monad (liftM2)
 import Data.List (foldl1')
+import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
-import Text.PrettyPrint (render)
 
-import Value
+import Language.Python.Common.AST
+import Language.Python.Version3.Parser (parseExpr)
+
 import Magic
 import StringParser
+import Value
 
-type Env = Map.Map String Value
+type Env = Map String Value
 
 emptyEnv = Map.empty
 

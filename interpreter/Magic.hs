@@ -1,9 +1,10 @@
 module Magic (getBinOp, getUnOp) where
 
-import Value
 import Language.Python.Common.AST
-import Language.Python.Common.PrettyAST ()
 import Language.Python.Common.Pretty (pretty, render)
+import Language.Python.Common.PrettyAST ()
+
+import Value
 
 getBinOp :: Op annot -> Either String (Value -> Value -> Either String Value)
 getBinOp Plus{} = Right __add__

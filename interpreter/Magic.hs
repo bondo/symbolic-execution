@@ -6,7 +6,7 @@ import Language.Python.Common.PrettyAST ()
 
 import Value
 
-getBinOp :: Op annot -> Either String (Value -> Value -> Either String Value)
+getBinOp :: Op a -> Either String (Value -> Value -> Either String Value)
 getBinOp Plus{} = Right __add__
 getBinOp Minus{} = Right __sub__
 getBinOp Multiply{} = Right __mul__

@@ -12,19 +12,16 @@ import Language.Python.Version3.Parser (parseExpr)
 import Magic
 import StringParser
 import Value
+import qualified Env
 
-type Env = Map String Value
-
-emptyEnv = Map.empty
-
-evalExpr :: Env -> ExprSpan -> Either String Value
+evalExpr :: Env.Env String Value -> ExprSpan -> Either String Value
 evalExpr e i@Int{}     = Right . VInt $ int_value i
 evalExpr e i@LongInt{} = Right . VInt $ int_value i
 evalExpr e b@Bool{}    = Right . VBool $ bool_value b
 evalExpr e None{}      = Right VNone
 evalExpr e s@Strings{} = VStr `liftM` foldl1' (liftM2 (++)) strs
   where strs = map parseString $ strings_strings s
-evalExpr e var@Var{}   = maybe err Right $ Map.lookup str e
+evalExpr e var@Var{}   = maybe err Right $ Env.lookup str e
   where str = ident_string . var_ident $ var
         err = Left $ "The variable " ++ str ++ " is not defined."
 evalExpr e binop@BinaryOp{} = do
@@ -42,6 +39,21 @@ evalExpr e cond@CondExpr{} = do
   evalExpr e $ if getBool c
                then ce_true_branch cond
                else ce_false_branch cond
+evalExpr e lam@Lambda{} = Right $ VCls e (map name (lambda_args lam)) (lambda_body lam)
+  where name param@Param{} = ident_string . param_name $ param
+evalExpr e call@Call{} = do
+  fun <- evalExpr e (call_fun call)
+  args <- foldl (liftM2 . flip $ (:)) (Right []) $ map (evalExpr e . unpack) $ call_args call
+  apply fun args
+  where unpack arg@ArgExpr{} = arg_expr arg
+  
+apply :: Value -> [Value] -> Either String Value
+apply fun args = do
+  (e, params, body) <- ecls
+  evalExpr (Env.extend e $ zip params args) body
+  where ecls = case fun of
+          VCls e params body -> return (e, params, body)
+          _ -> Left "Trying to apply non-function"
 
 getBool :: Value -> Bool
 getBool (VInt 0)  = False
@@ -53,9 +65,15 @@ getBool VNone     = False
 
 
 -- Utils
+evalWith :: Env.Env String Value -> String -> Either String Value
+evalWith e = either (Left . show) evaluator . flip parseExpr "outer space"
+  where evaluator = evalExpr e . fst
+        
 eval :: String -> Either String Value
-eval = either (Left . show) evaluator . flip parseExpr "outer space"
-  where evaluator = evalExpr emptyEnv . fst
+eval = evalWith Env.emptyEnv
+
+evalWithIO :: Env.Env String Value -> String -> IO ()
+evalWithIO e = putStrLn . either ("Error: "++) (("Result: "++) . show) . evalWith e
 
 evalIO :: String -> IO ()
 evalIO = putStrLn . either ("Error: "++) (("Result: "++) . show) . eval

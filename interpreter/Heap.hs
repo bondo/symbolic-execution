@@ -38,7 +38,7 @@ set r v = do
   put $ Heap $ Map.insert r v m
 
 run :: HeapM v a -> (a, Heap v)
-run hs = evalState (runStateT hs $ Heap $ Map.empty) (Register 0)
+run hs = evalState (runStateT hs $ Heap Map.empty) $ Register 0
 
 exec :: HeapM v a -> a
 exec = fst . run

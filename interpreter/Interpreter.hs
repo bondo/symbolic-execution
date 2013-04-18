@@ -64,7 +64,7 @@ evalExpr e call@Call{} = do
   where unpack arg@ArgExpr{} = arg_expr arg
 
 evalExprList :: Env -> [ExprSpan] -> EitherM [Value]
-evalExprList e = mapM (evalExpr e)
+evalExprList e = mapM $ evalExpr e
   
 apply :: Value -> [Value] -> EitherM Value
 apply fun args = do

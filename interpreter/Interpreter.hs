@@ -22,9 +22,9 @@ import Heap (Register)
 
 type Env = Env.Env String Register
 type HeapM = Heap.HeapM Value
-type EitherM = EitherT String HeapM
+type InterpreterM = EitherT String HeapM
 
-evalExpr :: Env -> ExprSpan -> EitherM Value
+evalExpr :: Env -> ExprSpan -> InterpreterM Value
 evalExpr e i@Int{}     = return $ VInt $ int_value i
 evalExpr e i@LongInt{} = return $ VInt $ int_value i
 evalExpr e b@Bool{}    = return $ VBool $ bool_value b
@@ -63,10 +63,10 @@ evalExpr e call@Call{} = do
   -- TODO: Other cases / error message
   where unpack arg@ArgExpr{} = arg_expr arg
 
-evalExprList :: Env -> [ExprSpan] -> EitherM [Value]
+evalExprList :: Env -> [ExprSpan] -> InterpreterM [Value]
 evalExprList e = mapM $ evalExpr e
   
-apply :: Value -> [Value] -> EitherM Value
+apply :: Value -> [Value] -> InterpreterM Value
 apply fun args = do
   (e, params, body) <- ecls
   args <- lift $ mapM Heap.malloc args
@@ -86,7 +86,7 @@ getBool (VStr "") = False
 getBool (VStr _)  = True
 getBool VNone     = False
 
-run :: EitherM a ->  (Either String a, Heap.Heap Value)
+run :: InterpreterM a ->  (Either String a, Heap.Heap Value)
 run = Heap.run . runEitherT
 
 -- Utils

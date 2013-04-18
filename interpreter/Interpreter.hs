@@ -4,8 +4,6 @@ import Control.Monad (liftM, liftM2)
 import Control.Monad.Trans.Either
 import Control.Monad.Trans.Class (lift)
 import Data.List (foldl1', foldl')
-import Data.Map (Map)
-import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
 
 import Language.Python.Common.AST

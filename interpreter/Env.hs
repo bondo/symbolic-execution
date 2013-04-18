@@ -11,4 +11,4 @@ extend :: Ord k => Env k v -> [(k, v)] -> Env k v
 extend e assoc = Map.fromList assoc : e
 
 lookup :: Ord k => k -> Env k v -> Maybe v
-lookup k e = msum (map (Map.lookup k) e)
+lookup k e = msum $ map (Map.lookup k) e

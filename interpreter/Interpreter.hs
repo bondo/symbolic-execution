@@ -1,7 +1,11 @@
+{-# LANGUAGE TupleSections, ScopedTypeVariables #-}
+
 module Interpreter (evalExpr) where
 
 import Control.Monad (liftM, liftM2)
-import Data.List (foldl1')
+import Control.Monad.Trans.Either
+import Control.Monad.Trans.Class (lift)
+import Data.List (foldl1', foldl')
 import Data.Map (Map)
 import qualified Data.Map as Map
 import Data.Maybe (fromMaybe)
@@ -13,53 +17,69 @@ import Magic
 import StringParser
 import Value
 import qualified Env
+import qualified Heap
+import Heap (Register)
 
-type Env = Env.Env String Value
+type Env = Env.Env String Register
+type HeapM = Heap.HeapM Value
+type EitherM = EitherT String HeapM
 
-evalExpr :: Env -> ExprSpan -> Either String Value
-evalExpr e i@Int{}     = Right . VInt $ int_value i
-evalExpr e i@LongInt{} = Right . VInt $ int_value i
-evalExpr e b@Bool{}    = Right . VBool $ bool_value b
-evalExpr e None{}      = Right VNone
-evalExpr e s@Strings{} = VStr `liftM` foldl1' (liftM2 (++)) strs
-  where strs = map parseString $ strings_strings s
-evalExpr e var@Var{}   = maybe err Right $ Env.lookup str e
+fromEither :: Either String a -> EitherM a
+fromEither = either left right
+
+evalExpr :: Env -> ExprSpan -> EitherM Value
+evalExpr e i@Int{}     = return $ VInt $ int_value i
+evalExpr e i@LongInt{} = return $ VInt $ int_value i
+evalExpr e b@Bool{}    = return $ VBool $ bool_value b
+evalExpr e None{}      = return VNone
+evalExpr e s@Strings{} = do
+  s <- foldl1' (liftM2 (++)) strs
+  return $ VStr s
+  where strs = map (fromEither . parseString) $ strings_strings s
+evalExpr e var@Var{} = do
+  cell <- maybe err return $ Env.lookup str e
+  value <- lift $ Heap.lookup cell
+  maybe err return value
   where str = ident_string . var_ident $ var
-        err = Left $ "The variable " ++ str ++ " is not defined."
+        err = left $ "The variable " ++ str ++ " is not defined."
 evalExpr e binop@BinaryOp{} = do
   v1 <- evalExpr e $ left_op_arg binop
   v2 <- evalExpr e $ right_op_arg binop
-  op  <- getBinOp $ operator binop
-  v1 `op` v2
+  op  <- fromEither $ getBinOp $ operator binop
+  fromEither $ v1 `op` v2
 evalExpr e unop@UnaryOp{} = do
   i  <- evalExpr e $ op_arg unop
-  op <- getUnOp $ operator unop
-  op i
+  op <- fromEither $ getUnOp $ operator unop
+  fromEither $ op i
 evalExpr e par@Paren{} = evalExpr e $ paren_expr par
 evalExpr e cond@CondExpr{} = do
   c <- evalExpr e $ ce_condition cond
   evalExpr e $ if getBool c
                then ce_true_branch cond
                else ce_false_branch cond
-evalExpr e lam@Lambda{} = Right $ VCls e (map name (lambda_args lam)) (lambda_body lam)
+evalExpr e lam@Lambda{} = return $ VCls e (map name (lambda_args lam)) (lambda_body lam)
   where name param@Param{} = ident_string . param_name $ param
 evalExpr e call@Call{} = do
-  fun <- evalExpr e (call_fun call)
-  args <- foldl (liftM2 . flip $ (:)) (Right []) $ map (evalExpr e . unpack) $ call_args call
+  fun <- evalExpr e $ call_fun call
+  args <- evalExprList e $ map unpack $ call_args call
   apply fun args
   -- TODO: Other cases / error message
   where unpack arg@ArgExpr{} = arg_expr arg
+
+evalExprList :: Env -> [ExprSpan] -> EitherM [Value]
+evalExprList e = mapM (evalExpr e)
   
-apply :: Value -> [Value] -> Either String Value
+apply :: Value -> [Value] -> EitherM Value
 apply fun args = do
   (e, params, body) <- ecls
+  args <- lift $ mapM Heap.malloc args
   assoc <- if length params == length args
-           then Right $ zip params args
-           else Left "Wrong number of arguments, yo!"
+           then return $ zip params args
+           else left "Wrong number of arguments, yo!"
   evalExpr (Env.extend e assoc) body
   where ecls = case fun of
-          VCls e params body -> Right (e, params, body)
-          _ -> Left "Trying to apply non-function"
+          VCls e params body -> return (e, params, body)
+          _ -> left "Trying to apply non-function"
 
 getBool :: Value -> Bool
 getBool (VInt 0)  = False
@@ -69,11 +89,12 @@ getBool (VStr "") = False
 getBool (VStr _)  = True
 getBool VNone     = False
 
+run :: EitherM a ->  (Either String a, Heap.Heap Value)
+run = Heap.run . runEitherT
 
 -- Utils
 evalWith :: Env -> String -> Either String Value
-evalWith e = either (Left . show) evaluator . flip parseExpr "outer space"
-  where evaluator = evalExpr e . fst
+evalWith e = either (Left . show) (fst . run . evalExpr e . fst) . flip parseExpr ""
         
 eval :: String -> Either String Value
 eval = evalWith Env.emptyEnv

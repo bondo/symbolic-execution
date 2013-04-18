@@ -25,9 +25,9 @@ type HeapM = Heap.HeapM Value
 type InterpreterM = EitherT String HeapM
 
 evalExpr :: Env -> ExprSpan -> InterpreterM Value
-evalExpr e i@Int{}     = return $ VInt $ int_value i
-evalExpr e i@LongInt{} = return $ VInt $ int_value i
-evalExpr e b@Bool{}    = return $ VBool $ bool_value b
+evalExpr e i@Int{}     = return . VInt $ int_value i
+evalExpr e i@LongInt{} = return . VInt $ int_value i
+evalExpr e b@Bool{}    = return . VBool $ bool_value b
 evalExpr e None{}      = return VNone
 evalExpr e s@Strings{} = do
   s <- hoistEither $ foldl1' (liftM2 (++)) strs
@@ -67,7 +67,7 @@ evalExpr e call@Call{} = do
 evalExpr _ exp = left $ "Evaluation of expression not implemented: " ++ render (pretty exp)
 
 evalExprList :: Env -> [ExprSpan] -> InterpreterM [Value]
-evalExprList e = mapM $ evalExpr e
+evalExprList = mapM . evalExpr
   
 apply :: Value -> [Value] -> InterpreterM Value
 apply fun args = do

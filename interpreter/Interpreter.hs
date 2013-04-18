@@ -1,5 +1,3 @@
-{-# LANGUAGE TupleSections, ScopedTypeVariables #-}
-
 module Interpreter (evalExpr) where
 
 import Control.Monad (liftM, liftM2)

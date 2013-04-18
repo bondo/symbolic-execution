@@ -1,10 +1,9 @@
 module Interpreter (Env, evalExpr, run, eval, exec) where
 
-import Control.Monad (liftM, liftM2)
+import Control.Monad (liftM2)
 import Control.Monad.Trans.Either
 import Control.Monad.Trans.Class (lift)
-import Data.List (foldl1', foldl')
-import Data.Maybe (fromMaybe)
+import Data.List (foldl1')
 
 import Language.Python.Common.AST
 import Language.Python.Common.Pretty (pretty, render)
@@ -22,11 +21,11 @@ type HeapM = Heap.HeapM Value
 type InterpreterM = EitherT String HeapM
 
 evalExpr :: Env -> ExprSpan -> InterpreterM Value
-evalExpr e i@Int{}     = return . VInt $ int_value i
-evalExpr e i@LongInt{} = return . VInt $ int_value i
-evalExpr e b@Bool{}    = return . VBool $ bool_value b
-evalExpr e None{}      = return VNone
-evalExpr e s@Strings{} = do
+evalExpr _ i@Int{}     = return . VInt $ int_value i
+evalExpr _ i@LongInt{} = return . VInt $ int_value i
+evalExpr _ b@Bool{}    = return . VBool $ bool_value b
+evalExpr _ None{}      = return VNone
+evalExpr _ s@Strings{} = do
   s <- hoistEither $ foldl1' (liftM2 (++)) strs
   return $ VStr s
   where strs = map parseString $ strings_strings s
@@ -85,6 +84,7 @@ getBool (VBool b) = b
 getBool (VStr "") = False
 getBool (VStr _)  = True
 getBool VNone     = False
+getBool VCls{}    = True
 
 run :: InterpreterM a ->  (Either String a, Heap.Heap Value)
 run = Heap.run . runEitherT

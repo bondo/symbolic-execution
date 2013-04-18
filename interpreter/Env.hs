@@ -5,6 +5,7 @@ import Control.Monad
 
 type Env k v = [Map.Map k v]
 
+emptyEnv :: Env k v
 emptyEnv = []
 
 extend :: Ord k => Env k v -> [(k, v)] -> Env k v

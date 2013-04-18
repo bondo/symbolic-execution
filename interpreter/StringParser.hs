@@ -22,7 +22,7 @@ parseStr = quotedEscaped (str "\"\"\"")
         quoted quotes = between quotes quotes
 
 parseRawString :: Parser String
-parseRawString = undefined
+parseRawString = error "StringParser.parseRawString not implemented"
 
 parseEscapedString :: Parser String -> Parser String
 parseEscapedString quotes = catMaybes `liftM` manyTill parseEscapedChar (lookAhead quotes)
@@ -49,23 +49,24 @@ parseEscapedChar = (str "\\\n" >> return Nothing)
 
 -- Parse stuff like: LATIN SMALL LETTER B, single space between words (in python 3.2.3)
 parseUnicodeName :: Parser Char
-parseUnicodeName = sepBy1 parseUnicodeNameWord (char ' ') >>= undefined
+parseUnicodeName = sepBy1 parseUnicodeNameWord (char ' ') >>=
+                   error "StringParser.parseUnicodeName not implemented"
 
 parseUnicodeNameWord :: Parser String
 parseUnicodeNameWord = many1 letter
 
 -- parse /[0-9a-fA-F]{4,4}/
 parseFourDigitHex :: Parser Char
-parseFourDigitHex = undefined
+parseFourDigitHex = error "StringParser.parseFourDigitHex not implemented"
 
 -- parse /[0-9a-fA-F]{8,8}/
 parseEightDigitHex :: Parser Char
-parseEightDigitHex = undefined
+parseEightDigitHex = error "StringParser.parseEightDigitHex not implemented"
 
 -- parse /\\[0-7]{1,3}/
 parseOct :: Parser Char
-parseOct = undefined
+parseOct = error "StringParser.parseOct not implemented"
 
 -- parse /\\x[0-9a-fA-F]{3,3}/
 parseHex :: Parser Char
-parseHex = undefined
+parseHex = error "StringParser.parseHex not implemented"

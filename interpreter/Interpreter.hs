@@ -24,9 +24,6 @@ type Env = Env.Env String Register
 type HeapM = Heap.HeapM Value
 type EitherM = EitherT String HeapM
 
-fromEither :: Either String a -> EitherM a
-fromEither = either left right
-
 evalExpr :: Env -> ExprSpan -> EitherM Value
 evalExpr e i@Int{}     = return $ VInt $ int_value i
 evalExpr e i@LongInt{} = return $ VInt $ int_value i
@@ -35,7 +32,7 @@ evalExpr e None{}      = return VNone
 evalExpr e s@Strings{} = do
   s <- foldl1' (liftM2 (++)) strs
   return $ VStr s
-  where strs = map (fromEither . parseString) $ strings_strings s
+  where strs = map (hoistEither . parseString) $ strings_strings s
 evalExpr e var@Var{} = do
   cell <- maybe err return $ Env.lookup str e
   value <- lift $ Heap.lookup cell
@@ -45,12 +42,12 @@ evalExpr e var@Var{} = do
 evalExpr e binop@BinaryOp{} = do
   v1 <- evalExpr e $ left_op_arg binop
   v2 <- evalExpr e $ right_op_arg binop
-  op  <- fromEither $ getBinOp $ operator binop
-  fromEither $ v1 `op` v2
+  op  <- hoistEither $ getBinOp $ operator binop
+  hoistEither $ v1 `op` v2
 evalExpr e unop@UnaryOp{} = do
   i  <- evalExpr e $ op_arg unop
-  op <- fromEither $ getUnOp $ operator unop
-  fromEither $ op i
+  op <- hoistEither $ getUnOp $ operator unop
+  hoistEither $ op i
 evalExpr e par@Paren{} = evalExpr e $ paren_expr par
 evalExpr e cond@CondExpr{} = do
   c <- evalExpr e $ ce_condition cond

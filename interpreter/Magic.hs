@@ -10,6 +10,7 @@ getBinOp :: Op a -> Either String (Value -> Value -> Either String Value)
 getBinOp Plus{} = Right __add__
 getBinOp Minus{} = Right __sub__
 getBinOp Multiply{} = Right __mul__
+getBinOp LessThan{} = Right __lt__
 getBinOp op = Left $ "Binary operator '" ++ render (pretty op) ++ "' not implemented."
 
 getUnOp :: Op annot -> Either String (Value -> Either String Value)
@@ -52,6 +53,17 @@ __mul__ v1@(VBool b1) = bool__mul__
   where bool__mul__ (VInt i2) = Right . VInt $ if b1 then i2 else 0
         bool__mul__ (VBool b2) = Right . VInt $ if b1 && b2 then 1 else 0
         bool__mul__ v2 = Left $ operandTypeError "*" v1 v2
+__mul__ v1 = Left . operandTypeError "*" v1
+
+__lt__ :: Value -> Value -> Either String Value
+__lt__ v1@(VInt i1) = int__lt__
+  where int__lt__ (VInt i2) = Right . VBool $ i1 < i2
+        int__lt__ (VBool b2) = Right . VBool $ if b2
+                                              then i1 < 1
+                                              else i1 < 0
+        int__lt__ v2 = Left $ operandTypeError "<" v1 v2
+-- TODO: __lt__ for bools and strings
+__lt__ v1 = Left . operandTypeError "<" v1
 
 operandTypeError :: String -> Value -> Value -> String
 operandTypeError op v1 v2 = "TypeError: unsupported operand type(s) for "

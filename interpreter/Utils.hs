@@ -18,3 +18,6 @@ evalWithIO e = putStrLn . either ("Error: "++) (("Result: "++) . show) . evalWit
 
 evalIO :: String -> IO ()
 evalIO = evalWithIO Env.emptyEnv
+
+-- > evalIO "(lambda Y, fac: Y(fac))(lambda f: (lambda x: x(x))(lambda y: f(lambda arg: y(y)(arg))), lambda f: lambda n: (1 if n<2 else n*f(n-1)))(5)"
+-- Result: VInt 120

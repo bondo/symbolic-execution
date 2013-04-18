@@ -51,15 +51,17 @@ evalExpr e cond@CondExpr{} = do
   evalExpr e $ if getBool c
                then ce_true_branch cond
                else ce_false_branch cond
-evalExpr e lam@Lambda{} = return $ VCls e (map name $ lambda_args lam) $ lambda_body lam
-  -- TODO: Other cases / error message
-  where name param@Param{} = ident_string . param_name $ param
+evalExpr e lam@Lambda{} = do
+  args <- hoistEither $ mapM name $ lambda_args lam
+  return $ VCls e args $ lambda_body lam
+  where name param@Param{} = Right . ident_string . param_name $ param
+        name p = Left $ "Unsupported parameter syntax: " ++ show p
 evalExpr e call@Call{} = do
   fun  <- evalExpr e $ call_fun call
-  args <- evalExprList e $ map unpack $ call_args call
+  args <- evalExprList e =<< (hoistEither $ mapM unpack $ call_args call)
   apply fun args
-  -- TODO: Other cases / error message
-  where unpack arg@ArgExpr{} = arg_expr arg
+  where unpack arg@ArgExpr{} = Right $ arg_expr arg
+        unpack arg = Left $ "Unsupported argument syntax: " ++ show arg
 evalExpr _ exp = left $ "Evaluation of expression not implemented: " ++ render (pretty exp)
 
 evalExprList :: Env -> [ExprSpan] -> InterpreterM [Value]

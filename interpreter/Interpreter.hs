@@ -14,7 +14,9 @@ import StringParser
 import Value
 import qualified Env
 
-evalExpr :: Env.Env String Value -> ExprSpan -> Either String Value
+type Env = Env.Env String Value
+
+evalExpr :: Env -> ExprSpan -> Either String Value
 evalExpr e i@Int{}     = Right . VInt $ int_value i
 evalExpr e i@LongInt{} = Right . VInt $ int_value i
 evalExpr e b@Bool{}    = Right . VBool $ bool_value b
@@ -45,14 +47,18 @@ evalExpr e call@Call{} = do
   fun <- evalExpr e (call_fun call)
   args <- foldl (liftM2 . flip $ (:)) (Right []) $ map (evalExpr e . unpack) $ call_args call
   apply fun args
+  -- TODO: Other cases / error message
   where unpack arg@ArgExpr{} = arg_expr arg
   
 apply :: Value -> [Value] -> Either String Value
 apply fun args = do
   (e, params, body) <- ecls
-  evalExpr (Env.extend e $ zip params args) body
+  assoc <- if length params == length args
+           then Right $ zip params args
+           else Left "Wrong number of arguments, yo!"
+  evalExpr (Env.extend e assoc) body
   where ecls = case fun of
-          VCls e params body -> return (e, params, body)
+          VCls e params body -> Right (e, params, body)
           _ -> Left "Trying to apply non-function"
 
 getBool :: Value -> Bool
@@ -65,15 +71,15 @@ getBool VNone     = False
 
 
 -- Utils
-evalWith :: Env.Env String Value -> String -> Either String Value
+evalWith :: Env -> String -> Either String Value
 evalWith e = either (Left . show) evaluator . flip parseExpr "outer space"
   where evaluator = evalExpr e . fst
         
 eval :: String -> Either String Value
 eval = evalWith Env.emptyEnv
 
-evalWithIO :: Env.Env String Value -> String -> IO ()
+evalWithIO :: Env -> String -> IO ()
 evalWithIO e = putStrLn . either ("Error: "++) (("Result: "++) . show) . evalWith e
 
 evalIO :: String -> IO ()
-evalIO = putStrLn . either ("Error: "++) (("Result: "++) . show) . eval
+evalIO = evalWithIO Env.emptyEnv

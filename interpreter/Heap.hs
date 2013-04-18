@@ -40,8 +40,8 @@ set r v = do
 run :: HeapM v a -> (a, Heap v)
 run hs = evalState (runStateT hs $ Heap Map.empty) $ Register 0
 
-exec :: HeapM v a -> a
-exec = fst . run
+eval :: HeapM v a -> a
+eval = fst . run
 
-eval :: HeapM v a -> Heap v
-eval = snd . run
+exec :: HeapM v a -> Heap v
+exec = snd . run

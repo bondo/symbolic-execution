@@ -1,4 +1,4 @@
-module Interpreter (evalExpr) where
+module Interpreter (Env, evalExpr, run, eval, exec) where
 
 import Control.Monad (liftM, liftM2)
 import Control.Monad.Trans.Either
@@ -11,7 +11,6 @@ import Data.Maybe (fromMaybe)
 import Language.Python.Common.AST
 import Language.Python.Common.Pretty (pretty, render)
 import Language.Python.Common.PrettyAST ()
-import Language.Python.Version3.Parser (parseExpr)
 
 import Magic
 import StringParser
@@ -92,18 +91,8 @@ getBool VNone     = False
 run :: InterpreterM a ->  (Either String a, Heap.Heap Value)
 run = Heap.run . runEitherT
 
-exec :: InterpreterM a ->  Either String a
+eval :: InterpreterM a -> Either String a
+eval = Heap.eval . runEitherT
+
+exec :: InterpreterM a ->  Heap.Heap Value
 exec = Heap.exec . runEitherT
-
--- Utils
-evalWith :: Env -> String -> Either String Value
-evalWith e = either (Left . show) (exec . evalExpr e . fst) . flip parseExpr ""
-        
-eval :: String -> Either String Value
-eval = evalWith Env.emptyEnv
-
-evalWithIO :: Env -> String -> IO ()
-evalWithIO e = putStrLn . either ("Error: "++) (("Result: "++) . show) . evalWith e
-
-evalIO :: String -> IO ()
-evalIO = evalWithIO Env.emptyEnv

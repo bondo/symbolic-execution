@@ -21,14 +21,14 @@ type HeapM = Heap.HeapM Value
 type InterpreterM = EitherT String HeapM
 
 evalExpr :: Env -> ExprSpan -> InterpreterM Value
-evalExpr _ i@Int{}     = return . VInt $ int_value i
-evalExpr _ i@LongInt{} = return . VInt $ int_value i
-evalExpr _ b@Bool{}    = return . VBool $ bool_value b
-evalExpr _ None{}      = return VNone
-evalExpr _ s@Strings{} = do
+evalExpr _ i@Int{}      = return . VInt $ int_value i
+evalExpr _ i@LongInt{}  = return . VInt $ int_value i
+evalExpr _ b@Bool{}     = return . VBool $ bool_value b
+evalExpr _ None{}       = return VNone
+evalExpr _ ss@Strings{} = do
   s <- hoistEither $ foldl1' (liftM2 (++)) strs
   return $ VStr s
-  where strs = map parseString $ strings_strings s
+  where strs = map parseString $ strings_strings ss
 evalExpr e var@Var{} = do
   cell  <- maybe err return $ Env.lookup str e
   value <- lift $ Heap.lookup cell
@@ -62,7 +62,7 @@ evalExpr e call@Call{} = do
   apply fun args
   where unpack arg@ArgExpr{} = Right $ arg_expr arg
         unpack arg = Left $ "Unsupported argument syntax: " ++ show arg
-evalExpr _ exp = left $ "Evaluation of expression not implemented: " ++ render (pretty exp)
+evalExpr _ expr = left $ "Evaluation of expression not implemented: " ++ render (pretty expr)
 
 evalExprList :: Env -> [ExprSpan] -> InterpreterM [Value]
 evalExprList = mapM . evalExpr
@@ -70,9 +70,9 @@ evalExprList = mapM . evalExpr
 apply :: Value -> [Value] -> InterpreterM Value
 apply fun args = do
   (e, params, body) <- ecls
-  args  <- lift $ mapM Heap.malloc args
-  assoc <- if length params == length args
-           then return $ zip params args
+  argRegisters  <- lift $ mapM Heap.malloc args
+  assoc <- if length params == length argRegisters
+           then return $ zip params argRegisters
            else left "Wrong number of arguments, yo!"
   evalExpr (Env.extend e assoc) body
   where ecls = case fun of
@@ -88,11 +88,11 @@ getBool (VStr _)  = True
 getBool VNone     = False
 getBool VCls{}    = True
 
-run :: InterpreterM a ->  (Either String a, Heap.Heap Value)
+run :: InterpreterM a -> (Either String a, Heap.Heap Value)
 run = Heap.run . runEitherT
 
 eval :: InterpreterM a -> Either String a
 eval = Heap.eval . runEitherT
 
-exec :: InterpreterM a ->  Heap.Heap Value
+exec :: InterpreterM a -> Heap.Heap Value
 exec = Heap.exec . runEitherT

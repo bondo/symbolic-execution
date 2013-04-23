@@ -13,7 +13,8 @@ namesStmts = Set.unions . map namesStmt
 
 namesStmt :: Statement a -> Set String
 namesStmt s@Import{}     = Set.unions . map namesImportItem $ import_items s
-namesStmt s@FromImport{} = Set.union (namesImportRelative $ from_module s) (namesFromItems $ from_items s)
+namesStmt s@FromImport{} = namesImportRelative (from_module s) `Set.union`
+                           namesFromItems (from_items s)
 namesStmt s@While{}      = Set.unions [ namesExpr $ while_cond s
                                       , namesSuite $ while_body s
                                       , namesSuite $ while_else s
@@ -32,12 +33,12 @@ namesStmt s@Class{} = Set.unions [ namesIdent $ class_name s
                                  , namesArguments $ class_args s
                                  , namesSuite $ class_body s
                                  ]
-namesStmt s@Conditional{} = Set.unions $ (namesSuite $ cond_else s) : guardNames
-  where guardNames = map (\(e,su) -> Set.union (namesExpr e) (namesSuite su)) $ cond_guards s
-namesStmt s@Assign{}          = Set.union (namesExprs $ assign_to s) (namesExpr $ assign_expr s)
-namesStmt s@AugmentedAssign{} = Set.union (namesExpr $ aug_assign_to s)
-                                          (namesExpr $ aug_assign_expr s)
-namesStmt s@Decorated{} = Set.unions $ (namesStmt $ decorated_def s) : decoratorsNames
+namesStmt s@Conditional{} = Set.unions $ namesSuite (cond_else s) : guardNames
+  where guardNames = map (\(e,su) -> namesExpr e `Set.union` namesSuite su) $ cond_guards s
+namesStmt s@Assign{}          = namesExprs (assign_to s) `Set.union` namesExpr (assign_expr s)
+namesStmt s@AugmentedAssign{} = namesExpr (aug_assign_to s) `Set.union`
+                                namesExpr (aug_assign_expr s)
+namesStmt s@Decorated{} = Set.unions $ namesStmt (decorated_def s) : decoratorsNames
   where decoratorsNames = map namesDecorator $ decorated_decorators s
 namesStmt s@Return{} = namesExprMaybe $ return_expr s
 namesStmt s@Try{}    = Set.unions [ namesSuite $ try_body s
@@ -46,7 +47,7 @@ namesStmt s@Try{}    = Set.unions [ namesSuite $ try_body s
                                   , namesSuite $ try_finally s
                                   ]
 namesStmt s@Raise{} = namesRaiseExpr $ raise_expr s
-namesStmt s@With{}  = Set.unions $ (namesSuite $ with_body s) : contextNames
+namesStmt s@With{}  = Set.unions $ namesSuite (with_body s) : contextNames
   where contextNames = map namesExprAndMaybeExpr $ with_context s
 namesStmt s@Delete{}   = namesExprs $ del_exprs s
 namesStmt s@StmtExpr{} = namesExpr $ stmt_expr s
@@ -54,13 +55,13 @@ namesStmt s@Global{}   = namesIdents $ global_vars s
 namesStmt s@NonLocal{} = namesIdents $ nonLocal_vars s
 namesStmt s@Assert{}   = namesExprs $ assert_exprs s
 namesStmt s@Print{}    = namesExprs $ print_exprs s
-namesStmt s@Exec{}     = Set.union (namesExpr $ exec_expr s) globalsLocalsNames
+namesStmt s@Exec{}     = namesExpr (exec_expr s) `Set.union` globalsLocalsNames
   where globalsLocalsNames = maybe Set.empty namesExprAndMaybeExpr $ exec_globals_locals s
 namesStmt _ = Set.empty -- Pass, Break, Continue
 
 namesImportItem :: ImportItem a -> Set String
-namesImportItem i = Set.union (namesDottedName $ import_item_name i)
-                              (namesIdentMaybe $ import_as_name i)
+namesImportItem i = namesDottedName (import_item_name i) `Set.union`
+                    namesIdentMaybe (import_as_name i)
 
 namesImportRelative :: ImportRelative a -> Set String
 namesImportRelative = maybe Set.empty namesDottedName . import_relative_module
@@ -70,21 +71,21 @@ namesFromItems ImportEverything{} = Set.empty
 namesFromItems f@FromItems{}      = Set.unions . map namesFromItem $ from_items_items f
 
 namesFromItem :: FromItem a -> Set String
-namesFromItem f = Set.union (namesIdent $ from_item_name f) (namesIdentMaybe $ from_as_name f)
+namesFromItem f = namesIdent (from_item_name f) `Set.union` namesIdentMaybe (from_as_name f)
 
 namesSuite :: Suite a -> Set String
 namesSuite = namesStmts
 
 namesDecorator :: Decorator a -> Set String
-namesDecorator d = Set.union (namesDottedName $ decorator_name d) (namesArguments $ decorator_args d)
+namesDecorator d = namesDottedName (decorator_name d) `Set.union` namesArguments (decorator_args d)
 
 namesHandler :: Handler a -> Set String
-namesHandler h = Set.union (namesExceptClause $ handler_clause h) (namesSuite $ handler_suite h)
+namesHandler h = namesExceptClause (handler_clause h) `Set.union` namesSuite (handler_suite h)
 
 namesRaiseExpr :: RaiseExpr a -> Set String
 namesRaiseExpr (RaiseV3 r) = maybe Set.empty namesExprAndMaybeExpr r
 namesRaiseExpr (RaiseV2 r) = maybe Set.empty work r
-  where work (e, meme) = Set.union (namesExpr e) (maybe Set.empty namesExprAndMaybeExpr meme)
+  where work (e, meme) = namesExpr e `Set.union` maybe Set.empty namesExprAndMaybeExpr meme
 
 namesDottedName :: DottedName a -> Set String
 namesDottedName = namesIdents
@@ -93,20 +94,20 @@ namesExceptClause :: ExceptClause a -> Set String
 namesExceptClause e = maybe Set.empty namesExprAndMaybeExpr $ except_clause e
 
 namesExprAndMaybeExpr :: (Expr a, Maybe (Expr b)) -> Set String
-namesExprAndMaybeExpr (e,em) = Set.union (namesExpr e) (namesExprMaybe em)
+namesExprAndMaybeExpr (e,em) = namesExpr e `Set.union` namesExprMaybe em
 
 namesExprs :: [Expr a] -> Set String
 namesExprs = Set.unions . map namesExpr
 
 namesExpr :: Expr a -> Set String
 namesExpr e@Var{}        = namesIdent $ var_ident e
-namesExpr e@Call{}       = Set.union (namesExpr $ call_fun e) (namesArguments $ call_args e)
-namesExpr e@Subscript{}  = Set.union (namesExpr $ subscriptee e) (namesExpr $ subscript_expr e)
+namesExpr e@Call{}       = namesExpr (call_fun e) `Set.union` namesArguments (call_args e)
+namesExpr e@Subscript{}  = namesExpr (subscriptee e) `Set.union` namesExpr (subscript_expr e)
 namesExpr e@SlicedExpr{} = Set.unions $ namesExpr (slicee e) : map namesSlice (slices e)
 namesExpr e@CondExpr{}   = namesExprs [ce_true_branch e, ce_condition e, ce_false_branch e]
-namesExpr e@BinaryOp{}   = Set.union (namesExpr $ left_op_arg e) (namesExpr $ right_op_arg e)
+namesExpr e@BinaryOp{}   = namesExpr (left_op_arg e) `Set.union` namesExpr (right_op_arg e)
 namesExpr e@UnaryOp{}    = namesExpr $ op_arg e
-namesExpr e@Lambda{}     = Set.union (namesExpr $ lambda_body e) (namesParameters $ lambda_args e)
+namesExpr e@Lambda{}     = namesExpr (lambda_body e) `Set.union` namesParameters (lambda_args e)
 namesExpr e@Tuple{}      = namesExprs $ tuple_exprs e
 namesExpr e@Yield{}      = namesExprMaybe $ yield_expr e
 namesExpr e@Generator{}  = namesComprehensionExpr $ gen_comprehension e
@@ -123,7 +124,7 @@ namesExpr e@StringConversion{} = namesExpr $ backquoted_expr e
 namesExpr _ = Set.empty
 
 namesExprPair :: (Expr a, Expr b) -> Set String
-namesExprPair (a, b) = Set.union (namesExpr a) (namesExpr b)
+namesExprPair (a, b) = namesExpr a `Set.union` namesExpr b
 
 namesExprMaybe :: Maybe (Expr a) -> Set String
 namesExprMaybe = maybe Set.empty namesExpr
@@ -152,13 +153,13 @@ namesParameter p@Param{} = Set.unions [ namesIdent $ param_name p
                                       , namesExprMaybe $ param_py_annotation p
                                       , namesExprMaybe $ param_default p
                                       ]
-namesParameter p@VarArgsPos{} = Set.union (namesIdent $ param_name p)
-                                          (namesExprMaybe $ param_py_annotation p)
-namesParameter p@VarArgsKeyword{} = Set.union (namesIdent $ param_name p)
-                                              (namesExprMaybe $ param_py_annotation p)
+namesParameter p@VarArgsPos{} = namesIdent (param_name p) `Set.union`
+                                namesExprMaybe (param_py_annotation p)
+namesParameter p@VarArgsKeyword{} = namesIdent (param_name p) `Set.union`
+                                    namesExprMaybe (param_py_annotation p)
 namesParameter EndPositional{} = Set.empty
-namesParameter p@UnPackTuple{} = Set.union (namesParamTuple $ param_unpack_tuple p)
-                                           (namesExprMaybe $ param_default p)
+namesParameter p@UnPackTuple{} = namesParamTuple (param_unpack_tuple p) `Set.union`
+                                 namesExprMaybe (param_default p)
 
 namesParamTuple :: ParamTuple a -> Set String
 namesParamTuple p@ParamTupleName{} = namesIdent $ param_tuple_name p
@@ -173,11 +174,11 @@ namesSlice s@SliceExpr{} = namesExpr $ slice_expr s
 namesSlice SliceEllipsis{} = Set.empty
 
 namesComprehensionExpr :: Comprehension (Expr a) b -> Set String
-namesComprehensionExpr c = Set.union (namesExpr $ comprehension_expr c)
-                                     (namesCompFor $ comprehension_for c)
+namesComprehensionExpr c = namesExpr (comprehension_expr c) `Set.union`
+                           namesCompFor (comprehension_for c)
 
 namesComprehensionExprPair :: Comprehension (Expr a, Expr b) c -> Set String
-namesComprehensionExprPair c = Set.union exprPairNames compForNames
+namesComprehensionExprPair c = exprPairNames `Set.union` compForNames
   where exprPairNames = namesExprPair $ comprehension_expr c
         compForNames = namesCompFor $ comprehension_for c
 
@@ -195,4 +196,4 @@ namesCompIterMaybe :: Maybe (CompIter a) -> Set String
 namesCompIterMaybe = maybe Set.empty namesCompIter
 
 namesCompIf :: CompIf a -> Set String
-namesCompIf c = Set.union (namesExpr $ comp_if c) (namesCompIterMaybe $ comp_if_iter c)
+namesCompIf c = namesExpr (comp_if c) `Set.union` namesCompIterMaybe (comp_if_iter c)

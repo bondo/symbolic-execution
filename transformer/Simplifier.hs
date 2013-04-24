@@ -39,7 +39,9 @@ evalNameGen ss ng = fst $ evalState (runStateT ng $ filterPrefix namePrefix ss) 
 
 sequenceNameGen :: [NameGen ([a], b)] -> NameGen ([a], [b])
 sequenceNameGen []     = return ([], [])
-sequenceNameGen (n:ns) = undefined
+sequenceNameGen (n:ns) = do (as, b) <- n
+                            (as', bs) <- sequenceNameGen ns
+                            return (as ++ as', b : bs)
 
 mkVar :: Ident a -> Expr a
 mkVar i = Var i $ ident_annot i

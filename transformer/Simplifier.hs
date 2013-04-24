@@ -47,15 +47,15 @@ mkVar :: Ident a -> Expr a
 mkVar i = Var i $ ident_annot i
 
 newVar :: a -> NameGen (Expr a)
-newVar annot = do name <- freshName
-                  return . mkVar $ Ident name annot
+newVar a = do name <- freshName
+              return . mkVar $ Ident name a
 
 mkAssign :: Expr a -> Expr a -> Statement a
 mkAssign lhs rhs = Assign [lhs] rhs $ expr_annot lhs
 
 -- Return ([simple statement], Var expression)
 simplVar :: Expr a -> NameGen ([Statement a], Expr a)
-simplVar e@Var{} = return $ ([], e)
+simplVar e@Var{} = return ([], e)
 simplVar e = do (stmts, expr) <- simplExpr e
                 var <- newVar $ expr_annot e
                 return (stmts ++ [mkAssign var expr], var)
@@ -67,17 +67,17 @@ simplArgument a = do (exprStmts, exprVar) <- simplVar $ arg_expr a
 
 -- Return ([simple statement], simple expression)
 simplExpr :: Expr a -> NameGen ([Statement a], Expr a)
-simplExpr e@Var{}            = return $ ([], e)
-simplExpr e@Int{}            = return $ ([], e)
-simplExpr e@LongInt{}        = return $ ([], e)
-simplExpr e@Float{}          = return $ ([], e)
-simplExpr e@Imaginary{}      = return $ ([], e)
-simplExpr e@Bool{}           = return $ ([], e)
-simplExpr e@None{}           = return $ ([], e)
-simplExpr e@Ellipsis{}       = return $ ([], e)
-simplExpr e@ByteStrings{}    = return $ ([], e)
-simplExpr e@Strings{}        = return $ ([], e)
-simplExpr e@UnicodeStrings{} = return $ ([], e)
+simplExpr e@Var{}            = return ([], e)
+simplExpr e@Int{}            = return ([], e)
+simplExpr e@LongInt{}        = return ([], e)
+simplExpr e@Float{}          = return ([], e)
+simplExpr e@Imaginary{}      = return ([], e)
+simplExpr e@Bool{}           = return ([], e)
+simplExpr e@None{}           = return ([], e)
+simplExpr e@Ellipsis{}       = return ([], e)
+simplExpr e@ByteStrings{}    = return ([], e)
+simplExpr e@Strings{}        = return ([], e)
+simplExpr e@UnicodeStrings{} = return ([], e)
 simplExpr e@Call{} = do (funStmts, funVar) <- simplVar $ call_fun e
                         (argStmts, argVars) <- sequenceNameGen . map simplArgument $ call_args e
                         return (funStmts ++ argStmts, e{call_fun = funVar, call_args = argVars})

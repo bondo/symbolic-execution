@@ -81,15 +81,19 @@ simplExpr e@Ellipsis{}       = return ([], e)
 simplExpr e@ByteStrings{}    = return ([], e)
 simplExpr e@Strings{}        = return ([], e)
 simplExpr e@UnicodeStrings{} = return ([], e)
-simplExpr e@Call{} = do (funStmts, funVar) <- simplVar $ call_fun e
-                        (argStmts, argVars) <- mapNameGen simplArgument $ call_args e
-                        return (funStmts ++ argStmts, e{call_fun = funVar, call_args = argVars})
+simplExpr e@Call{} = do
+  (funStmts, funVar) <- simplVar $ call_fun e
+  (argStmts, argVars) <- mapNameGen simplArgument $ call_args e
+  return (funStmts ++ argStmts, e{call_fun = funVar, call_args = argVars})
 -- Subscript
 -- SlicedExpr
 -- CondExpr
-simplExpr e@BinaryOp{} = do (leftStmts, leftVar) <- simplVar $ left_op_arg e
-                            (rightStmts, rightVar) <- simplVar $ right_op_arg e
-                            return (leftStmts ++ rightStmts, e{left_op_arg = leftVar, right_op_arg = rightVar})
+simplExpr e@BinaryOp{} = do
+  (leftStmts, leftVar) <- simplVar $ left_op_arg e
+  (rightStmts, rightVar) <- simplVar $ right_op_arg e
+  return (leftStmts ++ rightStmts, e{ left_op_arg = leftVar
+                                    , right_op_arg = rightVar
+                                    } )
 simplExpr e@UnaryOp{} = do (stmts, var) <- simplVar $ op_arg e
                            return (stmts, e{op_arg = var})
 -- Lambda
@@ -108,27 +112,31 @@ simplExpr e@Set{} = do (stmts, vars) <- mapNameGen simplVar $ set_exprs e
 -- Starred
 simplExpr e@Paren{} = simplExpr $ paren_expr e
 -- StringConversion
-simplExpr e = error $ "Simplifier.simplExpr called on unsupported expression: " ++ render (pretty e)
+simplExpr e = error $
+              "Simplifier.simplExpr called on unsupported expression: " ++
+              render (pretty e)
 
 -- Return ([simple statement])
 simplStmt :: Statement a -> NameGen [Statement a]
 --simplStmt s@Import{}          = 
 --simplStmt s@FromImport{}      = 
-simplStmt s@While{}           = do (condStmts, condVar) <- simplVar $ while_cond s
-                                   bodySuite <- simplSuite $ while_body s
-                                   elseSuite <- simplSuite $ while_else s
-                                   return $ condStmts ++ [ s{ while_cond = condVar
-                                                            , while_body = bodySuite
-                                                            , while_else = elseSuite
-                                                            } ]
+simplStmt s@While{} = do
+  (condStmts, condVar) <- simplVar $ while_cond s
+  bodySuite <- simplSuite $ while_body s
+  elseSuite <- simplSuite $ while_else s
+  return $ condStmts ++ [ s{ while_cond = condVar
+                           , while_body = bodySuite
+                           , while_else = elseSuite
+                           } ]
 --simplStmt s@For{}             = 
-simplStmt s@Fun{}             = do (paramStmts, params) <- mapNameGen simplParameter $ fun_args s
-                                   (annotStmts, annotExpr) <- simplExprMaybe $ fun_result_annotation s
-                                   bodySuite <- simplSuite $ fun_body s
-                                   return $ paramStmts ++ annotStmts ++ [ s{ fun_args = params
-                                                                           , fun_result_annotation = annotExpr
-                                                                           , fun_body = bodySuite
-                                                                           } ]
+simplStmt s@Fun{} = do
+  (paramStmts, params) <- mapNameGen simplParameter $ fun_args s
+  (annotStmts, annotExpr) <- simplExprMaybe $ fun_result_annotation s
+  bodySuite <- simplSuite $ fun_body s
+  return $ paramStmts ++ annotStmts ++ [ s{ fun_args = params
+                                          , fun_result_annotation = annotExpr
+                                          , fun_body = bodySuite
+                                          } ]
 --simplStmt s@Class{}           = 
 --simplStmt s@Conditional{}     = 
 --simplStmt s@Assign{}          = 
@@ -148,7 +156,9 @@ simplStmt s@Fun{}             = do (paramStmts, params) <- mapNameGen simplParam
 --simplStmt s@Assert{}          = 
 --simplStmt s@Print{}           = 
 --simplStmt s@Exec{}            = 
-simplStmt s = error $ "Simplifier.simplStmt called on unsupported statement: " ++ render (pretty s)
+simplStmt s = error $
+              "Simplifier.simplStmt called on unsupported statement: " ++
+              render (pretty s)
 
 simplSuite :: Suite a -> NameGen (Suite a)
 simplSuite = simplStmts
@@ -158,11 +168,14 @@ simplStmts ss = concat `liftM` mapM simplStmt ss
 
 -- Return ([simple statement], simple parameter)
 simplParameter :: Parameter a -> NameGen ([Statement a], Parameter a)
-simplParameter p@Param{} = do (annotStmts, annotExpr) <- simplExprMaybe $ param_py_annotation p
-                              (defaultStmts, defaultExpr) <- simplExprMaybe $ param_default p
-                              return (annotStmts ++ defaultStmts, p{ param_py_annotation = annotExpr
-                                                                   , param_default = defaultExpr})
-simplParameter p = error $ "Simplifier.simplParameter called on unsupported parameter type: " ++ render (pretty p)
+simplParameter p@Param{} = do
+  (annotStmts, annotExpr) <- simplExprMaybe $ param_py_annotation p
+  (defaultStmts, defaultExpr) <- simplExprMaybe $ param_default p
+  return (annotStmts ++ defaultStmts, p{ param_py_annotation = annotExpr
+                                       , param_default = defaultExpr})
+simplParameter p = error $
+                   "Simplifier.simplParameter called on unsupported parameter type: " ++
+                   render (pretty p)
 
 simplExprMaybe :: Maybe (Expr a) -> NameGen ([Statement a], Maybe (Expr a))
 simplExprMaybe Nothing     = return ([], Nothing)

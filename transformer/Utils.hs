@@ -10,7 +10,7 @@ import Language.Python.Common.Pretty (pretty, render)
 import Language.Python.Version3.Parser (parseExpr, parseStmt, parseModule)
 
 import Names (namesExpr, namesStmts, namesModule)
-import Simplifier (simplExpr, evalNameGen)
+import Simplifier (simplExpr, simplStmts, evalNameGen)
 
 getNames :: (String -> String -> Either ParseError (a,b)) -> (a -> Set String) -> String -> Set String
 getNames parse names = either (const Set.empty) (names . fst) . flip parse "" . (++"\n")
@@ -38,3 +38,12 @@ simplifyExpr str =  putStrLn $ either (("Error: "++) . show) (prettify . simplif
 --   tmp_4 = tmp_6 * tmp_3
 --   tmp_5 = tmp_4 * tmp_8
 -- Expr: tmp_2 + tmp_5
+
+simplifyStmt :: String -> IO ()
+simplifyStmt str = putStrLn $ either (("Error: "++) . show) (prettify . simplify) parsed
+  where parsed = parseStmt (str ++ "\n") ""
+        names = parseNamesInStmt str
+        simplify (ast, _) = evalNameGen names $ simplStmts ast
+        prettify stmts = concatMap ((++"\n") . render . pretty) stmts
+-- > simplifyStmt "if a+4 > b:\n a = b * a + 42\nelif b < 2*a:\n b = 2*a + 2*b + c**4\nelse:\n b = a * (b - 7)"
+-- ..........

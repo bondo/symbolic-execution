@@ -65,8 +65,11 @@ simplVar e = do (stmts, expr) <- simplExpr e
 
 -- Return ([simple statement], simple argument)
 simplArgument :: Argument a -> NameGen ([Statement a], Argument a)
-simplArgument a = do (exprStmts, exprVar) <- simplVar $ arg_expr a
-                     return (exprStmts, a{arg_expr = exprVar})
+simplArgument a@ArgExpr{} = do (exprStmts, exprVar) <- simplVar $ arg_expr a
+                               return (exprStmts, a{arg_expr = exprVar})
+simplArgument a = error $
+                  "Simplifier.simplArgument called on unsupported argument: " ++
+                  render (pretty a)
 
 -- Return ([simple statement], simple expression)
 simplExpr :: Expr a -> NameGen ([Statement a], Expr a)
@@ -137,25 +140,64 @@ simplStmt s@Fun{} = do
                                           , fun_result_annotation = annotExpr
                                           , fun_body = bodySuite
                                           } ]
---simplStmt s@Class{}           = 
---simplStmt s@Conditional{}     = 
---simplStmt s@Assign{}          = 
---simplStmt s@AugmentedAssign{} = 
+simplStmt s@Class{} = do
+  (paramStmts, params) <- mapNameGen simplArgument $ class_args s
+  bodySuite <- simplSuite $ class_body s
+  return $ paramStmts ++ [ s{ class_args = params
+                            , class_body = bodySuite
+                            } ]
+simplStmt s@Conditional{} =
+  if null guards
+  then error "Simplifier.simplStmt called on conditional with no guards"
+  else if null gs
+       -- Only one guard
+       then do (guardStmts, guardVar) <- simplVar guardExpr
+               guardSuite' <- simplSuite guardSuite
+               elseSuite <- simplSuite $ cond_else s
+               return $ guardStmts ++ [ s{ cond_guards = [(guardVar, guardSuite')]
+                                         , cond_else = elseSuite
+                                         } ]
+       -- Many guards
+       else simplStmt s{cond_guards = [g], cond_else = [innerCond]}
+  where guards = cond_guards s
+        g@(guardExpr, guardSuite) : gs = guards
+        innerCond = s{cond_guards = gs}
+simplStmt s@Assign{} = if length (assign_to s) /= 1
+                       then error "Simplifier.simplStmt: Only single LHS assignment supported."
+                       else do (lhsStmts, lhsVar) <- simplVar lhs
+                               (rhsStmts, rhsExpr) <- simplExpr $ assign_expr s
+                               return $ lhsStmts ++ rhsStmts ++ [ s{ assign_to = [lhsVar]
+                                                                   , assign_expr = rhsExpr
+                                                                   } ]
+  where [lhs] = assign_to s
+simplStmt s@AugmentedAssign{} = do
+  (lhsStmts, lhsVar) <- simplVar $ aug_assign_to s
+  (rhsStmts, rhsVar) <- simplVar $ aug_assign_expr s
+  return $ lhsStmts ++ rhsStmts ++ [ Assign [lhsVar] (op lhsVar rhsVar) $ stmt_annot s ]
+  where op = assignOpToBinOp $ aug_assign_op s
 --simplStmt s@Decorated{}       = 
---simplStmt s@Return{}          = 
+simplStmt s@Return{} = do (valStmts, valExpr) <- simplExprMaybe $ return_expr s
+                          return $ valStmts ++ [ s{return_expr = valExpr} ]
 --simplStmt s@Try{}             = 
 --simplStmt s@Raise{}           = 
 --simplStmt s@With{}            = 
---simplStmt s@Pass{}            = 
---simplStmt s@Break{}           = 
---simplStmt s@Continue{}        = 
+simplStmt s@Pass{}     = return [s]
+simplStmt s@Break{}    = return [s]
+simplStmt s@Continue{} = return [s]
 --simplStmt s@Delete{}          = 
---simplStmt s@StmtExpr{}        = 
---simplStmt s@Global{}          = 
---simplStmt s@NonLocal{}        = 
---simplStmt s@Assert{}          = 
---simplStmt s@Print{}           = 
---simplStmt s@Exec{}            = 
+simplStmt s@StmtExpr{} = do (exprStmts, expr) <- simplExpr $ stmt_expr s
+                            return $ exprStmts ++ [ s{stmt_expr = expr} ]
+simplStmt s@Global{}   = return [s]
+simplStmt s@NonLocal{} = return [s]
+simplStmt s@Assert{}   = if length exprs /= 1
+                         then error $ "Simplifier.simplStmt - Assert form not supported: " ++
+                              render (pretty s)
+                         else do (exprStmts, var) <- simplVar $ head exprs
+                                 return $ exprStmts ++ [ s{assert_exprs = [var]} ]
+  where exprs = assert_exprs s
+simplStmt s@Print{} = do (exprStmts, exprs) <- mapNameGen simplExpr $ print_exprs s
+                         return $ exprStmts ++ [ s{print_exprs = exprs} ]
+--simplStmt s@Exec{}            =
 simplStmt s = error $
               "Simplifier.simplStmt called on unsupported statement: " ++
               render (pretty s)
@@ -174,10 +216,27 @@ simplParameter p@Param{} = do
   return (annotStmts ++ defaultStmts, p{ param_py_annotation = annotExpr
                                        , param_default = defaultExpr})
 simplParameter p = error $
-                   "Simplifier.simplParameter called on unsupported parameter type: " ++
+                   "Simplifier.simplParameter called on unsupported parameter: " ++
                    render (pretty p)
 
 simplExprMaybe :: Maybe (Expr a) -> NameGen ([Statement a], Maybe (Expr a))
 simplExprMaybe Nothing     = return ([], Nothing)
 simplExprMaybe (Just expr) = do (exprStmts, expr') <- simplExpr expr
                                 return (exprStmts, Just expr')
+
+makeBinOp :: Op a -> a -> Expr a -> Expr a -> Expr a
+makeBinOp op a l r = BinaryOp op l r a
+
+assignOpToBinOp :: AssignOp a -> Expr a -> Expr a -> Expr a
+assignOpToBinOp (PlusAssign a) = makeBinOp (Plus a) a
+assignOpToBinOp (MinusAssign a) = makeBinOp (Minus a) a
+assignOpToBinOp (MultAssign a) = makeBinOp (Multiply a) a
+assignOpToBinOp (DivAssign a) = makeBinOp (Divide a) a
+assignOpToBinOp (ModAssign a) = makeBinOp (Modulo a) a
+assignOpToBinOp (PowAssign a) = makeBinOp (Exponent a) a
+assignOpToBinOp (BinAndAssign a) = makeBinOp (BinaryAnd a) a
+assignOpToBinOp (BinOrAssign a) = makeBinOp (BinaryOr a) a
+assignOpToBinOp (BinXorAssign a) = makeBinOp (Xor a) a
+assignOpToBinOp (LeftShiftAssign a) = makeBinOp (ShiftLeft a) a
+assignOpToBinOp (RightShiftAssign a) = makeBinOp (ShiftRight a) a
+assignOpToBinOp (FloorDivAssign a) = makeBinOp (FloorDivide a) a

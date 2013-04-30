@@ -240,3 +240,6 @@ assignOpToBinOp (BinXorAssign a) = makeBinOp (Xor a) a
 assignOpToBinOp (LeftShiftAssign a) = makeBinOp (ShiftLeft a) a
 assignOpToBinOp (RightShiftAssign a) = makeBinOp (ShiftRight a) a
 assignOpToBinOp (FloorDivAssign a) = makeBinOp (FloorDivide a) a
+
+simplModule :: Module a -> NameGen (Module a)
+simplModule (Module ss) = Module `liftM` simplStmts ss

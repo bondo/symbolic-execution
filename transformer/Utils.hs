@@ -10,7 +10,7 @@ import Language.Python.Common.Pretty (pretty, render)
 import Language.Python.Version3.Parser (parseExpr, parseStmt, parseModule)
 
 import Names (namesExpr, namesStmts, namesModule)
-import Simplifier (simplExpr, simplStmts, evalNameGen)
+import Simplifier (simplExpr, simplStmts, simplModule, evalNameGen)
 
 getNames :: (String -> String -> Either ParseError (a,b)) -> (a -> Set String) -> String -> Set String
 getNames parse names = either (const Set.empty) (names . fst) . flip parse "" . (++"\n")
@@ -46,4 +46,11 @@ simplifyStmt str = putStrLn $ either (("Error: "++) . show) (prettify . simplify
         simplify (ast, _) = evalNameGen names $ simplStmts ast
         prettify stmts = concatMap ((++"\n") . render . pretty) stmts
 -- > simplifyStmt "if a+4 > b:\n a = b * a + 42\nelif b < 2*a:\n b = 2*a + 2*b + c**4\nelse:\n b = a * (b - 7)"
--- ..........
+
+simplifyModule :: String -> IO ()
+simplifyModule fname = do file <- (++"\n") `liftM` readFile fname
+                          names <- parseNamesInModule fname
+                          putStrLn . either (("Error: "++) . show) (prettify . simplify names) $ parseModule file ""
+  where simplify names (ast, _) = evalNameGen names $ simplModule ast
+        prettify = render . pretty
+-- > simplifyModule "../interpreter/tests/simple1.py"

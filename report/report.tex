@@ -1,7 +1,66 @@
 \documentclass[a4paper]{article}
 \begin{document}
 
-Hello, world!
+\section*{Introduction}
+
+Symbolic execution is a way to prove existence of errors in programs. 
+
+Symbolic values, constraint solving, etc.
+
+\section*{Goals}
+
+\section*{Overview}
+
+\section*{Normalization}
+
+We do a normalization in which statements and expressions are transformed into
+\emph{atomic actions}. For example, expressions are transformed into a single
+action on local variables and a list of statements that assign the value of the
+subexpressions into corresponding variables.
+
+Example: \verb!a + b * 4! is transformed into the following list of
+preceding statements
+\begin{verbatim}
+tmp_1 = 4
+tmp_2 = b * tmp_1
+\end{verbatim}
+and the expression \verb!a + tmp_2!
+
+\subsection*{Normalizing \texttt{if-elif-else}}
+
+\subsection*{Normalizing $\lambda$-expressions}
+
+\subsection*{Experimental verification}
+
+\section*{Instrumentation}
+
+\section*{Related work}
+
+\section*{Future work}
+
+\begin{itemize}
+  \item Nice diagram explaining the normalization in detail.
+  \item Instrumentation of code
+  \item Library for symbolic execution
+  \item Introduction 
+  \item Experimental verification of our normalization
+  \item Sprinkle with examples! \textbackslash{}o/
+  \item \LaTeX{} stuff
+  \item Roadmap
+  \item Small test programs for experimental verification of the normalization
+  \item Test programs for the final symbolic execution test
+\end{itemize}
+
+\subsection*{\LaTeX{} stuff}
+
+\begin{itemize}
+  \item A nice environment for python program text.
+  \item Something something for examples.
+\end{itemize}
+
+\subsection*{Roadmap}
+
+TODO
 
 \end{document}
 

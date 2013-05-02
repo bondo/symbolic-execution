@@ -121,8 +121,8 @@ simplExpr e = error $
 
 -- Return ([simple statement])
 simplStmt :: Statement a -> NameGen [Statement a]
---simplStmt s@Import{}          = 
---simplStmt s@FromImport{}      = 
+simplStmt s@Import{} = return [s]
+simplStmt s@FromImport{} = return [s]
 simplStmt s@While{} = do
   (condStmts, condVar) <- simplVar $ while_cond s
   bodySuite <- simplSuite $ while_body s
@@ -131,7 +131,11 @@ simplStmt s@While{} = do
                            , while_body = bodySuite
                            , while_else = elseSuite
                            } ]
---simplStmt s@For{}             = 
+simplStmt s@For{} = do
+  v <- getTarget $ for_targets s
+  undefined
+  where getTarget [v@Var{}] = v
+        getTarget _ = error "Banana phone!"
 simplStmt s@Fun{} = do
   (paramStmts, params) <- mapNameGen simplParameter $ fun_args s
   (annotStmts, annotExpr) <- simplExprMaybe $ fun_result_annotation s

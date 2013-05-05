@@ -132,17 +132,17 @@ simplStmt s@While{} = do
                            , while_else = elseSuite
                            } ]
 simplStmt s@For{} = do
-  v <- getTarget $ for_targets s
   (generatorStmts, generatorVar) <- simplVar $ for_generator s
   bodySuite <- simplSuite $ for_body s
   elseSuite <- simplSuite $ for_else s
-  return $ generatorStmts  ++ [ s{ for_generator = generatorVar
+  return $ generatorStmts  ++ [ s{ for_targets = getTarget $ for_targets s
+                                 , for_generator = generatorVar
                                  , for_body = bodySuite
                                  , for_else = elseSuite
                                  } ]
-  where getTarget [v@Var{}] = v
+  where getTarget [v@Var{}] = [v]
         getTarget _ = error $ "Unsupported target list in for-loop: "
-                      ++ render (pretty e)
+                      ++ render (pretty s)
 simplStmt s@Fun{} = do
   (paramStmts, params) <- mapNameGen simplParameter $ fun_args s
   (annotStmts, annotExpr) <- simplExprMaybe $ fun_result_annotation s

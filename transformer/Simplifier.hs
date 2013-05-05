@@ -39,7 +39,7 @@ evalNameGen ss ng = fst $ evalState (runStateT ng $ filterPrefix namePrefix ss) 
 
 sequenceNameGen :: [NameGen ([a], b)] -> NameGen ([a], [b])
 sequenceNameGen []     = return ([], [])
-sequenceNameGen (n:ns) = do (as, b) <- n
+sequenceNameGen (n:ns) = do (as,  b)  <- n
                             (as', bs) <- sequenceNameGen ns
                             return (as ++ as', b : bs)
 
@@ -60,7 +60,7 @@ mkAssign lhs rhs = Assign [lhs] rhs $ expr_annot lhs
 simplVar :: Expr a -> NameGen ([Statement a], Expr a)
 simplVar e@Var{} = return ([], e)
 simplVar e = do (stmts, expr) <- simplExpr e
-                var <- newVar $ expr_annot e
+                var           <- newVar $ expr_annot e
                 return (stmts ++ [mkAssign var expr], var)
 
 -- Return ([simple statement], simple argument)
@@ -85,16 +85,16 @@ simplExpr e@ByteStrings{}    = return ([], e)
 simplExpr e@Strings{}        = return ([], e)
 simplExpr e@UnicodeStrings{} = return ([], e)
 simplExpr e@Call{} = do
-  (funStmts, funVar) <- simplVar $ call_fun e
+  (funStmts, funVar)  <- simplVar $ call_fun e
   (argStmts, argVars) <- mapNameGen simplArgument $ call_args e
   return (funStmts ++ argStmts, e{call_fun = funVar, call_args = argVars})
 -- Subscript
 -- SlicedExpr
 -- CondExpr
 simplExpr e@BinaryOp{} = do
-  (leftStmts, leftVar) <- simplVar $ left_op_arg e
+  (leftStmts, leftVar)   <- simplVar $ left_op_arg e
   (rightStmts, rightVar) <- simplVar $ right_op_arg e
-  return (leftStmts ++ rightStmts, e{ left_op_arg = leftVar
+  return (leftStmts ++ rightStmts, e{ left_op_arg  = leftVar
                                     , right_op_arg = rightVar
                                     } )
 simplExpr e@UnaryOp{} = do (stmts, var) <- simplVar $ op_arg e
@@ -121,39 +121,39 @@ simplExpr e = error $
 
 -- Return ([simple statement])
 simplStmt :: Statement a -> NameGen [Statement a]
-simplStmt s@Import{} = return [s]
+simplStmt s@Import{}     = return [s]
 simplStmt s@FromImport{} = return [s]
-simplStmt s@While{} = do
-  (condStmts, condVar) <- simplVar $ while_cond s
-  bodySuite <- simplSuite $ while_body s
-  elseSuite <- simplSuite $ while_else s
+simplStmt s@While{}      = do
+  (condStmts, condVar) <- simplVar   $ while_cond s   
+  bodySuite            <- simplSuite $ while_body s 
+  elseSuite            <- simplSuite $ while_else s 
   return $ condStmts ++ [ s{ while_cond = condVar
                            , while_body = bodySuite
                            , while_else = elseSuite
                            } ]
 simplStmt s@For{} = do
-  (generatorStmts, generatorVar) <- simplVar $ for_generator s
-  bodySuite <- simplSuite $ for_body s
-  elseSuite <- simplSuite $ for_else s
-  return $ generatorStmts  ++ [ s{ for_targets = getTarget $ for_targets s
-                                 , for_generator = generatorVar
-                                 , for_body = bodySuite
-                                 , for_else = elseSuite
-                                 } ]
-  where getTarget [v@Var{}] = [v]
-        getTarget _ = error $ "Unsupported target list in for-loop: "
-                      ++ render (pretty s)
+  (genStmts, genVar) <- simplVar   $ for_generator s
+  bodySuite          <- simplSuite $ for_body s
+  elseSuite          <- simplSuite $ for_else s
+  return $ genStmts ++ [ s{ for_targets   = getTargets $ for_targets s
+                          , for_generator = genVar
+                          , for_body      = bodySuite
+                          , for_else      = elseSuite
+                          } ]
+  where getTargets [v@Var{}] = [v]
+        getTargets _ = error $ "Unsupported target list in for-loop: "
+                       ++ render (pretty s)
 simplStmt s@Fun{} = do
-  (paramStmts, params) <- mapNameGen simplParameter $ fun_args s
-  (annotStmts, annotExpr) <- simplExprMaybe $ fun_result_annotation s
-  bodySuite <- simplSuite $ fun_body s
-  return $ paramStmts ++ annotStmts ++ [ s{ fun_args = params
+  (paramStmts, params)    <- mapNameGen simplParameter $ fun_args s
+  (annotStmts, annotExpr) <- simplExprMaybe            $ fun_result_annotation s
+  bodySuite               <- simplSuite                $ fun_body s
+  return $ paramStmts ++ annotStmts ++ [ s{ fun_args              = params
                                           , fun_result_annotation = annotExpr
-                                          , fun_body = bodySuite
+                                          , fun_body              = bodySuite
                                           } ]
 simplStmt s@Class{} = do
   (paramStmts, params) <- mapNameGen simplArgument $ class_args s
-  bodySuite <- simplSuite $ class_body s
+  bodySuite            <- simplSuite               $ class_body s
   return $ paramStmts ++ [ s{ class_args = params
                             , class_body = bodySuite
                             } ]
@@ -163,21 +163,21 @@ simplStmt s@Conditional{} =
   else if null gs
        -- Only one guard
        then do (guardStmts, guardVar) <- simplVar guardExpr
-               guardSuite' <- simplSuite guardSuite
-               elseSuite <- simplSuite $ cond_else s
+               guardSuite'            <- simplSuite guardSuite
+               elseSuite              <- simplSuite $ cond_else s
                return $ guardStmts ++ [ s{ cond_guards = [(guardVar, guardSuite')]
-                                         , cond_else = elseSuite
+                                         , cond_else   = elseSuite
                                          } ]
        -- Many guards
        else simplStmt s{cond_guards = [g], cond_else = [innerCond]}
-  where guards = cond_guards s
+  where guards                         = cond_guards s
         g@(guardExpr, guardSuite) : gs = guards
-        innerCond = s{cond_guards = gs}
+        innerCond                      = s{cond_guards = gs}
 simplStmt s@Assign{} = if length (assign_to s) /= 1
                        then error "Simplifier.simplStmt: Only single LHS assignment supported."
-                       else do (lhsStmts, lhsVar) <- simplVar lhs
+                       else do (lhsStmts, lhsVar)  <- simplVar lhs
                                (rhsStmts, rhsExpr) <- simplExpr $ assign_expr s
-                               return $ lhsStmts ++ rhsStmts ++ [ s{ assign_to = [lhsVar]
+                               return $ lhsStmts ++ rhsStmts ++ [ s{ assign_to   = [lhsVar]
                                                                    , assign_expr = rhsExpr
                                                                    } ]
   where [lhs] = assign_to s
@@ -222,10 +222,10 @@ simplStmts ss = concat `liftM` mapM simplStmt ss
 -- Return ([simple statement], simple parameter)
 simplParameter :: Parameter a -> NameGen ([Statement a], Parameter a)
 simplParameter p@Param{} = do
-  (annotStmts, annotExpr) <- simplExprMaybe $ param_py_annotation p
+  (annotStmts, annotExpr)     <- simplExprMaybe $ param_py_annotation p
   (defaultStmts, defaultExpr) <- simplExprMaybe $ param_default p
   return (annotStmts ++ defaultStmts, p{ param_py_annotation = annotExpr
-                                       , param_default = defaultExpr})
+                                       , param_default       = defaultExpr})
 simplParameter p = error $
                    "Simplifier.simplParameter called on unsupported parameter: " ++
                    render (pretty p)
@@ -239,18 +239,18 @@ makeBinOp :: Op a -> a -> Expr a -> Expr a -> Expr a
 makeBinOp op a l r = BinaryOp op l r a
 
 assignOpToBinOp :: AssignOp a -> Expr a -> Expr a -> Expr a
-assignOpToBinOp (PlusAssign a) = makeBinOp (Plus a) a
-assignOpToBinOp (MinusAssign a) = makeBinOp (Minus a) a
-assignOpToBinOp (MultAssign a) = makeBinOp (Multiply a) a
-assignOpToBinOp (DivAssign a) = makeBinOp (Divide a) a
-assignOpToBinOp (ModAssign a) = makeBinOp (Modulo a) a
-assignOpToBinOp (PowAssign a) = makeBinOp (Exponent a) a
-assignOpToBinOp (BinAndAssign a) = makeBinOp (BinaryAnd a) a
-assignOpToBinOp (BinOrAssign a) = makeBinOp (BinaryOr a) a
-assignOpToBinOp (BinXorAssign a) = makeBinOp (Xor a) a
-assignOpToBinOp (LeftShiftAssign a) = makeBinOp (ShiftLeft a) a
+assignOpToBinOp (PlusAssign a)       = makeBinOp (Plus a) a
+assignOpToBinOp (MinusAssign a)      = makeBinOp (Minus a) a
+assignOpToBinOp (MultAssign a)       = makeBinOp (Multiply a) a
+assignOpToBinOp (DivAssign a)        = makeBinOp (Divide a) a
+assignOpToBinOp (ModAssign a)        = makeBinOp (Modulo a) a
+assignOpToBinOp (PowAssign a)        = makeBinOp (Exponent a) a
+assignOpToBinOp (BinAndAssign a)     = makeBinOp (BinaryAnd a) a
+assignOpToBinOp (BinOrAssign a)      = makeBinOp (BinaryOr a) a
+assignOpToBinOp (BinXorAssign a)     = makeBinOp (Xor a) a
+assignOpToBinOp (LeftShiftAssign a)  = makeBinOp (ShiftLeft a) a
 assignOpToBinOp (RightShiftAssign a) = makeBinOp (ShiftRight a) a
-assignOpToBinOp (FloorDivAssign a) = makeBinOp (FloorDivide a) a
+assignOpToBinOp (FloorDivAssign a)   = makeBinOp (FloorDivide a) a
 
 simplModule :: Module a -> NameGen (Module a)
 simplModule (Module ss) = Module `liftM` simplStmts ss

@@ -45,7 +45,8 @@ symbSuite = concatMap symbStmt
 symbStmt :: StatementSpan -> [StatementSpan]
 --symbStmt s@Import{}          = 
 --symbStmt s@FromImport{}      = 
---symbStmt s@While{}           = 
+symbStmt s@While{while_cond = Var{var_ident = cond}, while_body = body, while_else = []} =
+  [s{ while_body = mkAssert cond : body }]
 --symbStmt s@For{}             = 
 symbStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = body}
   | Just idents <- mapM getIdent params = [s{fun_body = mkIntroScope idents : symbSuite body}]

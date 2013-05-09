@@ -129,14 +129,10 @@ simplExpr e = error $
 simplStmt :: StatementSpan -> NameGen [StatementSpan]
 simplStmt s@Import{}     = return [s]
 simplStmt s@FromImport{} = return [s]
-simplStmt s@While{while_cond = wCond, while_body = wBody, while_else = wElse} = do
-  (condStmts, condVar) <- simplVar wCond
+simplStmt s@While{while_cond = Var{}, while_body = wBody, while_else = wElse} = do
   bodySuite            <- simplSuite wBody
   elseSuite            <- simplSuite wElse
-  return $ condStmts ++ [ s{ while_cond = condVar
-                           , while_body = bodySuite
-                           , while_else = elseSuite
-                           } ]
+  return [s{while_body = bodySuite, while_else = elseSuite}]
 simplStmt s@For{for_generator = fGen, for_body = fBody, for_else = fElse, for_targets = [Var{}]} = do
   (genStmts, genVar) <- simplVar fGen
   bodySuite          <- simplSuite fBody

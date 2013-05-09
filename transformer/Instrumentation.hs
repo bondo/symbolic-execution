@@ -1,6 +1,9 @@
+{-# LANGUAGE PackageImports #-}
+
 module Instrumentation (instStmt, instModule) where
 
 import Control.Monad (msum, liftM)
+import "mtl" Control.Monad.Error ()
 import Data.List (transpose)
 
 import Language.Python.Common.AST

@@ -1,4 +1,4 @@
-module SymbolicAnnotation (symbStmt, symbModule) where
+module Instrumentation (instStmt, instModule) where
 
 import Control.Monad (msum)
 import Data.List (transpose)
@@ -36,51 +36,51 @@ mkAssert var = mkCall (mkIdent "symbolic_assert") [mkString var]
 mkRefute :: IdentSpan -> StatementSpan
 mkRefute var = mkCall (mkIdent "symbolic_refute") [mkString var]
 
-symbModule :: ModuleSpan -> ModuleSpan
-symbModule (Module m) = Module $ symbSuite m
+instModule :: ModuleSpan -> ModuleSpan
+instModule (Module m) = Module $ instSuite m
 
-symbSuite :: SuiteSpan -> SuiteSpan
-symbSuite = concatMap symbStmt
+instSuite :: SuiteSpan -> SuiteSpan
+instSuite = concatMap instStmt
 
-symbStmt :: StatementSpan -> [StatementSpan]
---symbStmt s@Import{}          = 
---symbStmt s@FromImport{}      = 
-symbStmt s@While{while_cond = Var{var_ident = cond}, while_body = body, while_else = []} =
+instStmt :: StatementSpan -> [StatementSpan]
+--instStmt s@Import{}          = 
+--instStmt s@FromImport{}      = 
+instStmt s@While{while_cond = Var{var_ident = cond}, while_body = body, while_else = []} =
   [s{ while_body = mkAssert cond : body }]
---symbStmt s@For{}             = 
-symbStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = body}
-  | Just idents <- mapM getIdent params = [s{fun_body = mkIntroScope idents : symbSuite body}]
+--instStmt s@For{}             = 
+instStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = body}
+  | Just idents <- mapM getIdent params = [s{fun_body = mkIntroScope idents : instSuite body}]
   where getIdent Param{ param_name = i
                       , param_py_annotation = Nothing
                       , param_default = Nothing} = Just i
         getIdent _ = Nothing
---symbStmt s@Class{}           = 
-symbStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
+--instStmt s@Class{}           = 
+instStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
   [s { cond_guards = [(cond, mkAssert i : suite)]
      , cond_else = mkRefute i : els
      }]
-symbStmt s@Assign{assign_to = [Var{var_ident = lhs}], assign_expr = rhs}
+instStmt s@Assign{assign_to = [Var{var_ident = lhs}], assign_expr = rhs}
   | Just stmt <- msum [litAss, callAss, opAss] = [stmt, s]
   where litAss  = getLiteralAssign lhs rhs
         callAss = getCallAssignment lhs rhs
         opAss   = getOpAssignment lhs rhs
---symbStmt s@AugmentedAssign{} = 
---symbStmt s@Decorated{}       = 
-symbStmt s@Return{} = [endScope, s]
---symbStmt s@Try{}             = 
---symbStmt s@Raise{}           = 
---symbStmt s@With{}            = 
-symbStmt s@Pass{}     = [s]
-symbStmt s@Break{}    = [s]
-symbStmt s@Continue{} = [s]
---symbStmt s@Delete{}          = 
---symbStmt s@StmtExpr{}        = 
---symbStmt s@Global{}          = 
---symbStmt s@NonLocal{}        = 
---symbStmt s@Assert{}          = 
---symbStmt s@Print{}           = 
---symbStmt s@Exec{}            = 
-symbStmt s = error $ "SymbolicAnnotation.symbStmt called on unsupported statement:\n" ++
+--instStmt s@AugmentedAssign{} = 
+--instStmt s@Decorated{}       = 
+instStmt s@Return{} = [endScope, s]
+--instStmt s@Try{}             = 
+--instStmt s@Raise{}           = 
+--instStmt s@With{}            = 
+instStmt s@Pass{}     = [s]
+instStmt s@Break{}    = [s]
+instStmt s@Continue{} = [s]
+--instStmt s@Delete{}          = 
+--instStmt s@StmtExpr{}        = 
+--instStmt s@Global{}          = 
+--instStmt s@NonLocal{}        = 
+--instStmt s@Assert{}          = 
+--instStmt s@Print{}           = 
+--instStmt s@Exec{}            = 
+instStmt s = error $ "Instrumentation.instStmt called on unsupported statement:\n" ++
              render (pretty s)
 
 litAssIdent :: IdentSpan

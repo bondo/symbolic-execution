@@ -12,7 +12,7 @@ import Language.Python.Version3.Parser (parseExpr, parseStmt, parseModule)
 
 import Names (namesExpr, namesStmts, namesModule)
 import Simplifier (simplExpr, simplStmts, simplModule, evalNameGen)
-import SymbolicAnnotation (symbStmt, symbModule)
+import Instrumentation (instStmt, instModule)
 
 getNames :: (String -> String -> Either ParseError (a,b)) -> (a -> Set String) -> String -> Set String
 getNames parse names = either (const Set.empty) (names . fst) . flip parse "" . (++"\n")
@@ -57,17 +57,17 @@ simplifyModule file = case parseModule (file++"\n") "" of
   Left e         -> Left $ show e
   Right (ast, _) -> Right . evalNameGen (parseNamesInModule file) $ simplModule ast
 -- > let Right mod = simplifyModule "a=c(d,e,42)"
--- > putPretty $ symbModule mod
+-- > putPretty $ instModule mod
 
 simplifyModuleIO :: String -> IO ()
 simplifyModuleIO = moduleIO simplifyModule
 -- > simplifyModuleIO "../interpreter/tests/simple1.py"
 
-annotateModule :: String -> Either String ModuleSpan
-annotateModule file = symbModule `liftM` simplifyModule file
+instrumentModule :: String -> Either String ModuleSpan
+instrumentModule file = instModule `liftM` simplifyModule file
 
-annotateModuleIO :: String -> IO ()
-annotateModuleIO = moduleIO annotateModule
+instrumentModuleIO :: String -> IO ()
+instrumentModuleIO = moduleIO instrumentModule
 
 moduleIO :: (String -> Either String ModuleSpan) -> String -> IO ()
 moduleIO fun fname = readFile fname >>= putStrLn . either ("Parse error: "++) (render . pretty) . fun

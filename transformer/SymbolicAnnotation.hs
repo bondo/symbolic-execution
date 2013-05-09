@@ -50,11 +50,9 @@ symbStmt s@Conditional{} | [(sCond@Var{var_ident = i}, sSuite)] <- cond_guards s
   [s { cond_guards = [(sCond, mkAssert i : sSuite)]
      , cond_else = mkRefute i : cond_else s
      }]
-symbStmt s@Assign{} | Just stmt <- msum [litAss, callAss, opAss] = [stmt, s]
-  where lhs = if length (assign_to s) /= 1
-              then badStatement s
-              else getIdent s . head $ assign_to s
-        rhs = assign_expr s
+symbStmt s@Assign{assign_to = [target], assign_expr = rhs}
+  | Just stmt <- msum [litAss, callAss, opAss] = [stmt, s]
+  where lhs = getIdent s target
         litAss  = getLiteralAssign lhs rhs
         callAss = getCallAssignment lhs rhs
         opAss   = getOpAssignment lhs rhs
@@ -98,23 +96,20 @@ getLiteralAssign i e@UnicodeStrings{} = Just $ mkCall litAssIdent [mkString i, e
 getLiteralAssign _ _                  = Nothing
 
 getCallAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
-getCallAssignment i e@Call{} | Var{} <- name
-                             , Just strs <- mapM asString $ call_args e
-                             , Just vars <- mapM asVar $ call_args e =
-  Just . mkCall callAssIdent $ [mkString i, mkString (var_ident name)] ++ concat (transpose [strs, vars])
-  where asString a@ArgExpr{} | v@Var{} <- arg_expr a = Just . mkString $ var_ident v
-        asString _ = Nothing
-        asVar a@ArgExpr{} | v@Var{} <- arg_expr a = Just . mkVar $ var_ident v
-        asVar _ = Nothing
-        name = call_fun e
+getCallAssignment i Call{call_fun = Var{var_ident = fun}, call_args = args}
+  | Just strs <- mapM (argTo mkString) args
+  , Just vars <- mapM (argTo mkVar) args =
+  Just . mkCall callAssIdent $ [mkString i, mkString fun] ++ concat (transpose [strs, vars])
+  where argTo to ArgExpr{arg_expr = Var{var_ident = i}} = Just $ to i
+        argTo _ _ = Nothing
 getCallAssignment _ _ = Nothing
 
 getOpAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
 getOpAssignment = error "SymbolicAnnotation.getOpAssignment not implemented"
 
 getIdent :: StatementSpan -> ExprSpan -> IdentSpan
-getIdent _ e@Var{} = var_ident e
-getIdent s _       = badStatement s
+getIdent _ Var{var_ident = i} = i
+getIdent s _                  = badStatement s
 
 badStatement s = error $
                  "SymbolicAnnotation.symbStmt called on unsupported statement: " ++

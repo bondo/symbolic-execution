@@ -10,6 +10,7 @@ import qualified Data.Set as Set
 import Language.Python.Common.AST
 import Language.Python.Common.Pretty (pretty, render)
 import Language.Python.Common.PrettyAST ()
+import Language.Python.Common.SrcLocation ( SrcSpan(SpanEmpty) )
 
 type NameGenCounter = State Int
 type NameGen = StateT (Set String) NameGenCounter
@@ -46,33 +47,34 @@ sequenceNameGen (n:ns) = do (as,  b)  <- n
 mapNameGen :: (a -> NameGen ([b], c)) -> [a] -> NameGen ([b], [c])
 mapNameGen f = sequenceNameGen . map f
 
-mkVar :: Ident a -> Expr a
-mkVar i = Var i $ ident_annot i
+mkVar :: IdentSpan -> ExprSpan
+mkVar i = Var i SpanEmpty
 
-newVar :: a -> NameGen (Expr a)
-newVar a = do name <- freshName
-              return . mkVar $ Ident name a
+newVar :: NameGen ExprSpan
+newVar = do name <- freshName
+            return . mkVar $ Ident name SpanEmpty
 
-mkAssign :: Expr a -> Expr a -> Statement a
-mkAssign lhs rhs = Assign [lhs] rhs $ expr_annot lhs
+mkAssign :: ExprSpan -> ExprSpan -> StatementSpan
+mkAssign lhs rhs = Assign [lhs] rhs SpanEmpty
 
 -- Return ([simple statement], Var expression)
-simplVar :: Expr a -> NameGen ([Statement a], Expr a)
+simplVar :: ExprSpan -> NameGen ([StatementSpan], ExprSpan)
 simplVar e@Var{} = return ([], e)
 simplVar e = do (stmts, expr) <- simplExpr e
-                var           <- newVar $ expr_annot e
+                var           <- newVar
                 return (stmts ++ [mkAssign var expr], var)
 
 -- Return ([simple statement], simple argument)
-simplArgument :: Argument a -> NameGen ([Statement a], Argument a)
-simplArgument a@ArgExpr{} = do (exprStmts, exprVar) <- simplVar $ arg_expr a
-                               return (exprStmts, a{arg_expr = exprVar})
+simplArgument :: ArgumentSpan -> NameGen ([StatementSpan], ArgumentSpan)
+simplArgument a@ArgExpr{arg_expr = expr} = do
+  (exprStmts, exprVar) <- simplVar expr
+  return (exprStmts, a{arg_expr = exprVar})
 simplArgument a = error $
                   "Simplifier.simplArgument called on unsupported argument: " ++
                   render (pretty a)
 
 -- Return ([simple statement], simple expression)
-simplExpr :: Expr a -> NameGen ([Statement a], Expr a)
+simplExpr :: ExprSpan -> NameGen ([StatementSpan], ExprSpan)
 simplExpr e@Var{}            = return ([], e)
 simplExpr e@Int{}            = return ([], e)
 simplExpr e@LongInt{}        = return ([], e)
@@ -84,104 +86,103 @@ simplExpr e@Ellipsis{}       = return ([], e)
 simplExpr e@ByteStrings{}    = return ([], e)
 simplExpr e@Strings{}        = return ([], e)
 simplExpr e@UnicodeStrings{} = return ([], e)
-simplExpr e@Call{} = do
-  (funStmts, funVar)  <- simplVar $ call_fun e
-  (argStmts, argVars) <- mapNameGen simplArgument $ call_args e
+simplExpr e@Call{call_fun = fun, call_args = args} = do
+  (funStmts, funVar)  <- simplVar fun
+  (argStmts, argVars) <- mapNameGen simplArgument args
   return (funStmts ++ argStmts, e{call_fun = funVar, call_args = argVars})
 -- Subscript
 -- SlicedExpr
 -- CondExpr
-simplExpr e@BinaryOp{} = do
-  (leftStmts, leftVar)   <- simplVar $ left_op_arg e
-  (rightStmts, rightVar) <- simplVar $ right_op_arg e
+simplExpr e@BinaryOp{left_op_arg = left, right_op_arg = right} = do
+  (leftStmts, leftVar)   <- simplVar left
+  (rightStmts, rightVar) <- simplVar right
   return (leftStmts ++ rightStmts, e{ left_op_arg  = leftVar
                                     , right_op_arg = rightVar
                                     } )
-simplExpr e@UnaryOp{} = do (stmts, var) <- simplVar $ op_arg e
-                           return (stmts, e{op_arg = var})
+simplExpr e@UnaryOp{op_arg = arg} = do
+  (stmts, var) <- simplVar arg
+  return (stmts, e{op_arg = var})
 -- Lambda
-simplExpr e@Tuple{} = do (stmts, vars) <- mapNameGen simplVar $ tuple_exprs e
-                         return (stmts, e{tuple_exprs = vars})
+simplExpr e@Tuple{tuple_exprs = exprs} = do
+  (stmts, vars) <- mapNameGen simplVar exprs
+  return (stmts, e{tuple_exprs = vars})
 -- Yield
 -- Generator
 -- ListComp
-simplExpr e@List{} = do (stmts, vars) <- mapNameGen simplVar $ list_exprs e
-                        return (stmts, e{list_exprs = vars})
+simplExpr e@List{list_exprs = exprs} = do
+  (stmts, vars) <- mapNameGen simplVar exprs
+  return (stmts, e{list_exprs = vars})
 -- Dictionary
 -- DictComp
-simplExpr e@Set{} = do (stmts, vars) <- mapNameGen simplVar $ set_exprs e
-                       return (stmts, e{set_exprs = vars})
+simplExpr e@Set{set_exprs = exprs} = do
+  (stmts, vars) <- mapNameGen simplVar exprs
+  return (stmts, e{set_exprs = vars})
 -- SetComp
 -- Starred
-simplExpr e@Paren{} = simplExpr $ paren_expr e
+simplExpr e@Paren{paren_expr = expr} = simplExpr expr
 -- StringConversion
 simplExpr e = error $
               "Simplifier.simplExpr called on unsupported expression: " ++
               render (pretty e)
 
 -- Return ([simple statement])
-simplStmt :: Statement a -> NameGen [Statement a]
+simplStmt :: StatementSpan -> NameGen [StatementSpan]
 simplStmt s@Import{}     = return [s]
 simplStmt s@FromImport{} = return [s]
-simplStmt s@While{}      = do
-  (condStmts, condVar) <- simplVar   $ while_cond s   
-  bodySuite            <- simplSuite $ while_body s 
-  elseSuite            <- simplSuite $ while_else s 
+simplStmt s@While{while_cond = wCond, while_body = wBody, while_else = wElse} = do
+  (condStmts, condVar) <- simplVar wCond
+  bodySuite            <- simplSuite wBody
+  elseSuite            <- simplSuite wElse
   return $ condStmts ++ [ s{ while_cond = condVar
                            , while_body = bodySuite
                            , while_else = elseSuite
                            } ]
-simplStmt s@For{} = do
-  (genStmts, genVar) <- simplVar   $ for_generator s
-  bodySuite          <- simplSuite $ for_body s
-  elseSuite          <- simplSuite $ for_else s
-  return $ genStmts ++ [ s{ for_targets   = getTargets $ for_targets s
-                          , for_generator = genVar
+simplStmt s@For{for_generator = fGen, for_body = fBody, for_else = fElse, for_targets = [Var{}]} = do
+  (genStmts, genVar) <- simplVar fGen
+  bodySuite          <- simplSuite fBody
+  elseSuite          <- simplSuite fElse
+  return $ genStmts ++ [ s{ for_generator = genVar
                           , for_body      = bodySuite
                           , for_else      = elseSuite
                           } ]
-  where getTargets [v@Var{}] = [v]
-        getTargets _ = error $ "Unsupported target list in for-loop: "
-                       ++ render (pretty s)
-simplStmt s@Fun{} = do
-  (paramStmts, params)    <- mapNameGen simplParameter $ fun_args s
-  (annotStmts, annotExpr) <- simplExprMaybe            $ fun_result_annotation s
-  bodySuite               <- simplSuite                $ fun_body s
+simplStmt s@Fun{fun_args = args, fun_result_annotation = res, fun_body = body} = do
+  (paramStmts, params)    <- mapNameGen simplParameter args
+  (annotStmts, annotExpr) <- simplExprMaybe res
+  bodySuite               <- simplSuite body
   return $ paramStmts ++ annotStmts ++ [ s{ fun_args              = params
                                           , fun_result_annotation = annotExpr
                                           , fun_body              = bodySuite
                                           } ]
-simplStmt s@Class{} = do
-  (paramStmts, params) <- mapNameGen simplArgument $ class_args s
-  bodySuite            <- simplSuite               $ class_body s
+simplStmt s@Class{class_args = args, class_body = body} = do
+  (paramStmts, params) <- mapNameGen simplArgument args
+  bodySuite            <- simplSuite body
   return $ paramStmts ++ [ s{ class_args = params
                             , class_body = bodySuite
                             } ]
-simplStmt s@Conditional{} | [(guardExpr, guardSuite)] <- cond_guards s = do
+simplStmt s@Conditional{cond_guards = [(guardExpr, guardSuite)], cond_else = cElse} = do
   (guardStmts, guardVar) <- simplVar guardExpr
   guardSuite'            <- simplSuite guardSuite
-  elseSuite              <- simplSuite $ cond_else s
+  elseSuite              <- simplSuite cElse
   return $ guardStmts ++ [ s{ cond_guards = [(guardVar, guardSuite')]
                             , cond_else   = elseSuite
                             } ]
-simplStmt s@Conditional{} | (g : gs) <- cond_guards s =
+simplStmt s@Conditional{cond_guards = g:gs} =
   simplStmt s{cond_guards = [g], cond_else = [s{cond_guards = gs}]}
-simplStmt s@Assign{} = if length (assign_to s) /= 1
-                       then error "Simplifier.simplStmt: Only single LHS assignment supported."
-                       else do (lhsStmts, lhsVar)  <- simplVar lhs
-                               (rhsStmts, rhsExpr) <- simplExpr $ assign_expr s
-                               return $ lhsStmts ++ rhsStmts ++ [ s{ assign_to   = [lhsVar]
-                                                                   , assign_expr = rhsExpr
-                                                                   } ]
-  where [lhs] = assign_to s
-simplStmt s@AugmentedAssign{} = do
-  (lhsStmts, lhsVar) <- simplVar $ aug_assign_to s
-  (rhsStmts, rhsVar) <- simplVar $ aug_assign_expr s
-  return $ lhsStmts ++ rhsStmts ++ [ Assign [lhsVar] (op lhsVar rhsVar) $ stmt_annot s ]
-  where op = assignOpToBinOp $ aug_assign_op s
+simplStmt s@Assign{assign_to = [lhs], assign_expr = expr} = do
+  (lhsStmts, lhsVar)  <- simplVar lhs
+  (rhsStmts, rhsExpr) <- simplExpr expr
+  return $ lhsStmts ++ rhsStmts ++ [ s{ assign_to   = [lhsVar]
+                                      , assign_expr = rhsExpr
+                                      } ]
+simplStmt AugmentedAssign{aug_assign_to = lhs, aug_assign_expr = expr, aug_assign_op = op} = do
+  (lhsStmts, lhsVar) <- simplVar lhs
+  (rhsStmts, rhsVar) <- simplVar expr
+  return $ lhsStmts ++ rhsStmts ++ [ Assign [lhsVar] (binOp lhsVar rhsVar) SpanEmpty ]
+  where binOp = assignOpToBinOp op
 --simplStmt s@Decorated{}       = 
-simplStmt s@Return{} = do (valStmts, valExpr) <- simplExprMaybe $ return_expr s
-                          return $ valStmts ++ [ s{return_expr = valExpr} ]
+simplStmt s@Return{return_expr = expr} = do
+  (valStmts, valExpr) <- simplExprMaybe expr
+  return $ valStmts ++ [ s{return_expr = valExpr} ]
 --simplStmt s@Try{}             = 
 --simplStmt s@Raise{}           = 
 --simplStmt s@With{}            = 
@@ -189,61 +190,60 @@ simplStmt s@Pass{}     = return [s]
 simplStmt s@Break{}    = return [s]
 simplStmt s@Continue{} = return [s]
 --simplStmt s@Delete{}          = 
-simplStmt s@StmtExpr{} = do (exprStmts, expr) <- simplExpr $ stmt_expr s
-                            return $ exprStmts ++ [ s{stmt_expr = expr} ]
+simplStmt s@StmtExpr{stmt_expr = expr} = do
+  (exprStmts, expr') <- simplExpr expr
+  return $ exprStmts ++ [ s{stmt_expr = expr'} ]
 simplStmt s@Global{}   = return [s]
 simplStmt s@NonLocal{} = return [s]
-simplStmt s@Assert{}   = if length exprs /= 1
-                         then error $ "Simplifier.simplStmt - Assert form not supported: " ++
-                              render (pretty s)
-                         else do (exprStmts, var) <- simplVar $ head exprs
-                                 return $ exprStmts ++ [ s{assert_exprs = [var]} ]
-  where exprs = assert_exprs s
-simplStmt s@Print{} = do (exprStmts, exprs) <- mapNameGen simplExpr $ print_exprs s
-                         return $ exprStmts ++ [ s{print_exprs = exprs} ]
+simplStmt s@Assert{assert_exprs = [expr]} = do
+  (exprStmts, var) <- simplVar expr
+  return $ exprStmts ++ [ s{assert_exprs = [var]} ]
+simplStmt s@Print{print_exprs = exprs} = do
+  (exprStmts, exprs) <- mapNameGen simplExpr exprs
+  return $ exprStmts ++ [ s{print_exprs = exprs} ]
 --simplStmt s@Exec{}            =
 simplStmt s = error $
               "Simplifier.simplStmt called on unsupported statement: " ++
               render (pretty s)
 
-simplSuite :: Suite a -> NameGen (Suite a)
+simplSuite :: SuiteSpan -> NameGen SuiteSpan
 simplSuite = simplStmts
 
-simplStmts :: [Statement a] -> NameGen [Statement a]
+simplStmts :: [StatementSpan] -> NameGen [StatementSpan]
 simplStmts ss = concat `liftM` mapM simplStmt ss
 
 -- Return ([simple statement], simple parameter)
-simplParameter :: Parameter a -> NameGen ([Statement a], Parameter a)
-simplParameter p@Param{} = do
-  (annotStmts, annotExpr)     <- simplExprMaybe $ param_py_annotation p
-  (defaultStmts, defaultExpr) <- simplExprMaybe $ param_default p
+simplParameter :: ParameterSpan -> NameGen ([StatementSpan], ParameterSpan)
+simplParameter p@Param{param_py_annotation = pAnnot, param_default = pDefault} = do
+  (annotStmts, annotExpr)     <- simplExprMaybe pAnnot
+  (defaultStmts, defaultExpr) <- simplExprMaybe pDefault
   return (annotStmts ++ defaultStmts, p{ param_py_annotation = annotExpr
                                        , param_default       = defaultExpr})
 simplParameter p = error $
                    "Simplifier.simplParameter called on unsupported parameter: " ++
                    render (pretty p)
 
-simplExprMaybe :: Maybe (Expr a) -> NameGen ([Statement a], Maybe (Expr a))
+simplExprMaybe :: Maybe ExprSpan -> NameGen ([StatementSpan], Maybe ExprSpan)
 simplExprMaybe Nothing     = return ([], Nothing)
 simplExprMaybe (Just expr) = do (exprStmts, expr') <- simplExpr expr
                                 return (exprStmts, Just expr')
 
-makeBinOp :: Op a -> a -> Expr a -> Expr a -> Expr a
-makeBinOp op a l r = BinaryOp op l r a
+makeBinOp :: (SrcSpan -> OpSpan) -> ExprSpan -> ExprSpan -> ExprSpan
+makeBinOp op l r = BinaryOp (op SpanEmpty) l r SpanEmpty
 
-assignOpToBinOp :: AssignOp a -> Expr a -> Expr a -> Expr a
-assignOpToBinOp (PlusAssign a)       = makeBinOp (Plus a) a
-assignOpToBinOp (MinusAssign a)      = makeBinOp (Minus a) a
-assignOpToBinOp (MultAssign a)       = makeBinOp (Multiply a) a
-assignOpToBinOp (DivAssign a)        = makeBinOp (Divide a) a
-assignOpToBinOp (ModAssign a)        = makeBinOp (Modulo a) a
-assignOpToBinOp (PowAssign a)        = makeBinOp (Exponent a) a
-assignOpToBinOp (BinAndAssign a)     = makeBinOp (BinaryAnd a) a
-assignOpToBinOp (BinOrAssign a)      = makeBinOp (BinaryOr a) a
-assignOpToBinOp (BinXorAssign a)     = makeBinOp (Xor a) a
-assignOpToBinOp (LeftShiftAssign a)  = makeBinOp (ShiftLeft a) a
-assignOpToBinOp (RightShiftAssign a) = makeBinOp (ShiftRight a) a
-assignOpToBinOp (FloorDivAssign a)   = makeBinOp (FloorDivide a) a
+assignOpToBinOp :: AssignOpSpan -> ExprSpan -> ExprSpan -> ExprSpan
+assignOpToBinOp PlusAssign{}       = makeBinOp Plus
+assignOpToBinOp MinusAssign{}      = makeBinOp Minus
+assignOpToBinOp MultAssign{}       = makeBinOp Multiply
+assignOpToBinOp DivAssign{}        = makeBinOp Divide
+assignOpToBinOp ModAssign{}        = makeBinOp Modulo
+assignOpToBinOp PowAssign{}        = makeBinOp Exponent
+assignOpToBinOp BinAndAssign{}     = makeBinOp BinaryAnd
+assignOpToBinOp BinOrAssign{}      = makeBinOp BinaryOr
+assignOpToBinOp BinXorAssign{}     = makeBinOp Xor
+assignOpToBinOp LeftShiftAssign{}  = makeBinOp ShiftLeft
+assignOpToBinOp RightShiftAssign{} = makeBinOp ShiftRight
+assignOpToBinOp FloorDivAssign{}   = makeBinOp FloorDivide
 
-simplModule :: Module a -> NameGen (Module a)
+simplModule :: ModuleSpan -> NameGen ModuleSpan
 simplModule (Module ss) = Module `liftM` simplStmts ss

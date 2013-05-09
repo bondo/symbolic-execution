@@ -180,9 +180,10 @@ simplStmt AugmentedAssign{aug_assign_to = lhs, aug_assign_expr = expr, aug_assig
   return $ lhsStmts ++ rhsStmts ++ [ Assign [lhsVar] (binOp lhsVar rhsVar) SpanEmpty ]
   where binOp = assignOpToBinOp op
 --simplStmt s@Decorated{}       = 
-simplStmt s@Return{return_expr = expr} = do
-  (valStmts, valExpr) <- simplExprMaybe expr
-  return $ valStmts ++ [ s{return_expr = valExpr} ]
+simplStmt s@Return{return_expr = Just expr} = do
+  (valStmts, valExpr) <- simplVar expr
+  return $ valStmts ++ [ s{return_expr = Just valExpr} ]
+simplStmt s@Return{return_expr = Nothing} = return [s]
 --simplStmt s@Try{}             = 
 --simplStmt s@Raise{}           = 
 --simplStmt s@With{}            = 

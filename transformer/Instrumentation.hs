@@ -49,13 +49,12 @@ instStmt s@While{while_cond = Var{var_ident = cond}, while_body = body, while_el
   Right [s{ while_body = mkAssert cond : body }]
 --instStmt s@For{}             = 
 instStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = body}
-  | Just idents <- mapM getIdent params = case instSuite body of
-    Left e      -> Left e
-    Right body' -> Right [s{fun_body = mkIntroScope idents : body'}]
+  | Just idents <- mapM getIdent params = buildStmt idents `liftM` instSuite body
   where getIdent Param{ param_name = i
                       , param_py_annotation = Nothing
                       , param_default = Nothing} = Just i
-        getIdent _ = Nothing
+        getIdent _  = Nothing
+        buildStmt idents body = [s{fun_body = mkIntroScope idents : body}]
 --instStmt s@Class{}           = 
 instStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
   Right [s { cond_guards = [(cond, mkAssert i : suite)]

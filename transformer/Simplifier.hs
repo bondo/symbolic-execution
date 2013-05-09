@@ -70,7 +70,7 @@ simplArgument a@ArgExpr{arg_expr = expr} = do
   (exprStmts, exprVar) <- simplVar expr
   return (exprStmts, a{arg_expr = exprVar})
 simplArgument a = error $
-                  "Simplifier.simplArgument called on unsupported argument: " ++
+                  "Simplifier.simplArgument called on unsupported argument:\n" ++
                   render (pretty a)
 
 -- Return ([simple statement], simple expression)
@@ -122,7 +122,7 @@ simplExpr e@Set{set_exprs = exprs} = do
 simplExpr e@Paren{paren_expr = expr} = simplExpr expr
 -- StringConversion
 simplExpr e = error $
-              "Simplifier.simplExpr called on unsupported expression: " ++
+              "Simplifier.simplExpr called on unsupported expression:\n" ++
               render (pretty e)
 
 -- Return ([simple statement])
@@ -203,7 +203,7 @@ simplStmt s@Print{print_exprs = exprs} = do
   return $ exprStmts ++ [ s{print_exprs = exprs} ]
 --simplStmt s@Exec{}            =
 simplStmt s = error $
-              "Simplifier.simplStmt called on unsupported statement: " ++
+              "Simplifier.simplStmt called on unsupported statement:\n" ++
               render (pretty s)
 
 simplSuite :: SuiteSpan -> NameGen SuiteSpan
@@ -220,7 +220,7 @@ simplParameter p@Param{param_py_annotation = pAnnot, param_default = pDefault} =
   return (annotStmts ++ defaultStmts, p{ param_py_annotation = annotExpr
                                        , param_default       = defaultExpr})
 simplParameter p = error $
-                   "Simplifier.simplParameter called on unsupported parameter: " ++
+                   "Simplifier.simplParameter called on unsupported parameter:\n" ++
                    render (pretty p)
 
 simplExprMaybe :: Maybe ExprSpan -> NameGen ([StatementSpan], Maybe ExprSpan)

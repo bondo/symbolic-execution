@@ -121,7 +121,7 @@ simplExpr e@Set{set_exprs = exprs} = do
   return (stmts, e{set_exprs = vars})
 -- SetComp
 -- Starred
-simplExpr e@Paren{paren_expr = expr} = simplExpr expr
+simplExpr Paren{paren_expr = expr} = simplExpr expr
 -- StringConversion
 simplExpr e = throwError $
               "Simplifier.simplExpr called on unsupported expression:\n" ++
@@ -198,8 +198,8 @@ simplStmt s@Assert{assert_exprs = [expr]} = do
   (exprStmts, var) <- simplVar expr
   return $ exprStmts ++ [ s{assert_exprs = [var]} ]
 simplStmt s@Print{print_exprs = exprs} = do
-  (exprStmts, exprs) <- mapNameGen simplExpr exprs
-  return $ exprStmts ++ [ s{print_exprs = exprs} ]
+  (exprStmts, exprs') <- mapNameGen simplExpr exprs
+  return $ exprStmts ++ [ s{print_exprs = exprs'} ]
 --simplStmt s@Exec{}            =
 simplStmt s = throwError $
               "Simplifier.simplStmt called on unsupported statement:\n" ++

@@ -12,7 +12,7 @@ import Language.Python.Version3.Parser (parseExpr, parseStmt, parseModule)
 
 import Names (namesExpr, namesStmts, namesModule)
 import Simplifier (simplExpr, simplStmts, simplModule, evalNameGen)
-import Instrumentation (instStmt, instModule)
+import Instrumentation (instModule)
 
 getNames :: (String -> String -> Either ParseError (a,b)) -> (a -> Set String) -> String -> Set String
 getNames parse names = either (const Set.empty) (names . fst) . flip parse "" . (++"\n")

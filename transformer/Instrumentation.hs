@@ -57,7 +57,7 @@ instStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = bo
                       , param_py_annotation = Nothing
                       , param_default = Nothing} = Just i
         getIdent _  = Nothing
-        buildStmt idents body = [s{fun_body = mkIntroScope idents : body}]
+        buildStmt idents b = [s{fun_body = mkIntroScope idents : b}]
 --instStmt s@Class{}           = 
 instStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
   Right [s { cond_guards = [(cond, mkAssert i : suite)]
@@ -113,13 +113,13 @@ getCallAssignment i Call{call_fun = Var{var_ident = fun}, call_args = args}
   | Just strs <- mapM (argTo mkString) args
   , Just vars <- mapM (argTo mkVar) args =
   Just . mkCall callAssIdent $ [mkString i, mkString fun] ++ concat (transpose [strs, vars])
-  where argTo to ArgExpr{arg_expr = Var{var_ident = i}} = Just $ to i
+  where argTo to ArgExpr{arg_expr = Var{var_ident = ident}} = Just $ to ident
         argTo _ _ = Nothing
 getCallAssignment _ _ = Nothing
 
 getOpAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
 getOpAssignment i b@BinaryOp{ left_op_arg = Var{var_ident = left}
                             , right_op_arg = Var{var_ident = right} } =
-  Just $ mkCall opAssIdent [op, mkString left, mkString right]
+  Just $ mkCall opAssIdent [mkString i, op, mkString left, mkString right]
   where op = mkString . mkIdent . render . pretty $ operator b
 getOpAssignment _ _ = Nothing

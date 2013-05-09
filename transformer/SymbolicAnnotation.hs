@@ -25,7 +25,7 @@ mkCall i es = StmtExpr { stmt_expr = expr, stmt_annot = SpanEmpty }
   where expr = Call { call_fun = mkVar i, call_args = map mkArg es, expr_annot = SpanEmpty }
 
 mkIntroScope :: [IdentSpan] -> StatementSpan
-mkIntroScope = error "SymbolicAnnotation.mkIntroScope not implemented"
+mkIntroScope = mkCall (mkIdent "symbolic_scope") . map mkString
 
 endScope :: StatementSpan
 endScope = mkCall (mkIdent "symbolic_return") []
@@ -37,14 +37,22 @@ mkRefute :: IdentSpan -> StatementSpan
 mkRefute var = mkCall (mkIdent "symbolic_refute") [mkString var]
 
 symbModule :: ModuleSpan -> ModuleSpan
-symbModule (Module m) = Module $ concatMap symbStmt m
+symbModule (Module m) = Module $ symbSuite m
+
+symbSuite :: SuiteSpan -> SuiteSpan
+symbSuite = concatMap symbStmt
 
 symbStmt :: StatementSpan -> [StatementSpan]
 --symbStmt s@Import{}          = 
 --symbStmt s@FromImport{}      = 
 --symbStmt s@While{}           = 
 --symbStmt s@For{}             = 
---symbStmt s@Fun{}             = 
+symbStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = body}
+  | Just idents <- mapM getIdent params = [s{fun_body = mkIntroScope idents : symbSuite body}]
+  where getIdent Param{ param_name = i
+                      , param_py_annotation = Nothing
+                      , param_default = Nothing} = Just i
+        getIdent _ = Nothing
 --symbStmt s@Class{}           = 
 symbStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
   [s { cond_guards = [(cond, mkAssert i : suite)]
@@ -71,7 +79,7 @@ symbStmt s@Continue{} = [s]
 --symbStmt s@Assert{}          = 
 --symbStmt s@Print{}           = 
 --symbStmt s@Exec{}            = 
-symbStmt s = error $ "SymbolicAnnotation.symbStmt called on unsupported statement: " ++
+symbStmt s = error $ "SymbolicAnnotation.symbStmt called on unsupported statement:\n" ++
              render (pretty s)
 
 litAssIdent :: IdentSpan
@@ -105,4 +113,8 @@ getCallAssignment i Call{call_fun = Var{var_ident = fun}, call_args = args}
 getCallAssignment _ _ = Nothing
 
 getOpAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
-getOpAssignment = error "SymbolicAnnotation.getOpAssignment not implemented"
+getOpAssignment i b@BinaryOp{ left_op_arg = Var{var_ident = left}
+                            , right_op_arg = Var{var_ident = right} } =
+  Just $ mkCall opAssIdent [op, mkString left, mkString right]
+  where op = mkString . mkIdent . render . pretty $ operator b
+getOpAssignment _ _ = Nothing

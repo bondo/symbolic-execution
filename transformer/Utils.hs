@@ -29,9 +29,14 @@ parseNamesInModule = getNames parseModule namesModule
 parseNamesInModuleIO :: String -> IO (Set String)
 parseNamesInModuleIO fname = parseNamesInModule `liftM` readFile fname
 
+mapLeft :: (e -> a) -> Either e b -> Either a b
+mapLeft f (Left e)  = Left $ f e
+mapLeft _ (Right b) = Right b
+
 simplifyExpr :: String -> IO ()
-simplifyExpr str =  putStrLn $ either (("Error: "++) . show) (prettify . simplify) parsed
-  where parsed = parseExpr str ""
+simplifyExpr str = putStrLn $ either (("Error: "++) . show) prettify simplified
+  where simplified = mapLeft show parsed >>= simplify
+        parsed = parseExpr str ""
         names = parseNamesInExpr str
         simplify (ast, _) = evalNameGen names $ simplExpr ast
         prettify (stmts, expr) = prettyStmts ++ prettyExpr
@@ -45,8 +50,9 @@ simplifyExpr str =  putStrLn $ either (("Error: "++) . show) (prettify . simplif
 -- Expr: tmp_2 + tmp_5
 
 simplifyStmt :: String -> IO ()
-simplifyStmt str = putStrLn $ either (("Error: "++) . show) (prettify . simplify) parsed
-  where parsed = parseStmt (str ++ "\n") ""
+simplifyStmt str = putStrLn $ either (("Error: "++) . show) prettify simplified
+  where simplified = mapLeft show parsed >>= simplify
+        parsed = parseStmt (str ++ "\n") ""
         names = parseNamesInStmt str
         simplify (ast, _) = evalNameGen names $ simplStmts ast
         prettify = concatMap ((++"\n") . render . pretty)
@@ -55,7 +61,7 @@ simplifyStmt str = putStrLn $ either (("Error: "++) . show) (prettify . simplify
 simplifyModule :: String -> Either String ModuleSpan
 simplifyModule file = case parseModule (file++"\n") "" of
   Left e         -> Left $ show e
-  Right (ast, _) -> Right . evalNameGen (parseNamesInModule file) $ simplModule ast
+  Right (ast, _) -> evalNameGen (parseNamesInModule file) $ simplModule ast
 -- > let Right mod = simplifyModule "a=c(d,e,42)"
 -- > putPretty $ instModule mod
 
@@ -64,13 +70,13 @@ simplifyModuleIO = moduleIO simplifyModule
 -- > simplifyModuleIO "../interpreter/tests/simple1.py"
 
 instrumentModule :: String -> Either String ModuleSpan
-instrumentModule file = instModule `liftM` simplifyModule file
+instrumentModule file = simplifyModule file >>= instModule
 
 instrumentModuleIO :: String -> IO ()
 instrumentModuleIO = moduleIO instrumentModule
 
 moduleIO :: (String -> Either String ModuleSpan) -> String -> IO ()
-moduleIO fun fname = readFile fname >>= putStrLn . either ("Parse error: "++) (render . pretty) . fun
+moduleIO fun fname = readFile fname >>= putStrLn . either ("Error: "++) (render . pretty) . fun
 
 putPretty :: Pretty a => a -> IO ()
 putPretty = putStrLn . render . pretty

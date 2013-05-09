@@ -2,6 +2,7 @@
 
 module Simplifier where
 
+import "mtl" Control.Monad.Error
 import "mtl" Control.Monad.State
 import Data.List (isPrefixOf)
 import Data.Set (Set)
@@ -12,7 +13,8 @@ import Language.Python.Common.Pretty (pretty, render)
 import Language.Python.Common.PrettyAST ()
 import Language.Python.Common.SrcLocation ( SrcSpan(SpanEmpty) )
 
-type NameGenCounter = State Int
+type NameGenError = Either String
+type NameGenCounter = StateT Int NameGenError
 type NameGen = StateT (Set String) NameGenCounter
 
 namePrefix :: String
@@ -33,10 +35,10 @@ filterPrefix = Set.filter . isPrefixOf
 -- > filterPrefix "ab" $ Set.fromList ["abc","aba","cba","acb","abb"]
 -- fromList ["aba","abb","abc"]
 
-evalNameGen :: Set String -> NameGen a -> a
-evalNameGen ss ng = fst $ evalState (runStateT ng $ filterPrefix namePrefix ss) 0
+evalNameGen :: Set String -> NameGen a -> Either String a
+evalNameGen ss ng = fst `liftM` evalStateT (runStateT ng $ filterPrefix namePrefix ss) 0
 -- > evalNameGen (Set.fromList ["tmp_2","tmp_4"]) . sequence . take 5 $ repeat freshName
--- ["tmp_1","tmp_3","tmp_5","tmp_6","tmp_7"]
+-- Right ["tmp_1","tmp_3","tmp_5","tmp_6","tmp_7"]
 
 sequenceNameGen :: [NameGen ([a], b)] -> NameGen ([a], [b])
 sequenceNameGen []     = return ([], [])
@@ -69,7 +71,7 @@ simplArgument :: ArgumentSpan -> NameGen ([StatementSpan], ArgumentSpan)
 simplArgument a@ArgExpr{arg_expr = expr} = do
   (exprStmts, exprVar) <- simplVar expr
   return (exprStmts, a{arg_expr = exprVar})
-simplArgument a = error $
+simplArgument a = throwError $
                   "Simplifier.simplArgument called on unsupported argument:\n" ++
                   render (pretty a)
 
@@ -121,7 +123,7 @@ simplExpr e@Set{set_exprs = exprs} = do
 -- Starred
 simplExpr e@Paren{paren_expr = expr} = simplExpr expr
 -- StringConversion
-simplExpr e = error $
+simplExpr e = throwError $
               "Simplifier.simplExpr called on unsupported expression:\n" ++
               render (pretty e)
 
@@ -199,7 +201,7 @@ simplStmt s@Print{print_exprs = exprs} = do
   (exprStmts, exprs) <- mapNameGen simplExpr exprs
   return $ exprStmts ++ [ s{print_exprs = exprs} ]
 --simplStmt s@Exec{}            =
-simplStmt s = error $
+simplStmt s = throwError $
               "Simplifier.simplStmt called on unsupported statement:\n" ++
               render (pretty s)
 
@@ -216,7 +218,7 @@ simplParameter p@Param{param_py_annotation = pAnnot, param_default = pDefault} =
   (defaultStmts, defaultExpr) <- simplExprMaybe pDefault
   return (annotStmts ++ defaultStmts, p{ param_py_annotation = annotExpr
                                        , param_default       = defaultExpr})
-simplParameter p = error $
+simplParameter p = throwError $
                    "Simplifier.simplParameter called on unsupported parameter:\n" ++
                    render (pretty p)
 

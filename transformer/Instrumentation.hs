@@ -1,6 +1,6 @@
 module Instrumentation (instStmt, instModule) where
 
-import Control.Monad (msum)
+import Control.Monad (msum, liftM)
 import Data.List (transpose)
 
 import Language.Python.Common.AST
@@ -36,43 +36,45 @@ mkAssert var = mkCall (mkIdent "symbolic_assert") [mkString var]
 mkRefute :: IdentSpan -> StatementSpan
 mkRefute var = mkCall (mkIdent "symbolic_refute") [mkString var]
 
-instModule :: ModuleSpan -> ModuleSpan
-instModule (Module m) = Module $ instSuite m
+instModule :: ModuleSpan -> Either String ModuleSpan
+instModule (Module m) = Module `liftM` instSuite m
 
-instSuite :: SuiteSpan -> SuiteSpan
-instSuite = concatMap instStmt
+instSuite :: SuiteSpan -> Either String SuiteSpan
+instSuite s = concat `liftM` mapM instStmt s
 
-instStmt :: StatementSpan -> [StatementSpan]
+instStmt :: StatementSpan -> Either String [StatementSpan]
 --instStmt s@Import{}          = 
 --instStmt s@FromImport{}      = 
 instStmt s@While{while_cond = Var{var_ident = cond}, while_body = body, while_else = []} =
-  [s{ while_body = mkAssert cond : body }]
+  Right [s{ while_body = mkAssert cond : body }]
 --instStmt s@For{}             = 
 instStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = body}
-  | Just idents <- mapM getIdent params = [s{fun_body = mkIntroScope idents : instSuite body}]
+  | Just idents <- mapM getIdent params = case instSuite body of
+    Left e      -> Left e
+    Right body' -> Right [s{fun_body = mkIntroScope idents : body'}]
   where getIdent Param{ param_name = i
                       , param_py_annotation = Nothing
                       , param_default = Nothing} = Just i
         getIdent _ = Nothing
 --instStmt s@Class{}           = 
 instStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
-  [s { cond_guards = [(cond, mkAssert i : suite)]
-     , cond_else = mkRefute i : els
-     }]
+  Right [s { cond_guards = [(cond, mkAssert i : suite)]
+           , cond_else = mkRefute i : els
+           }]
 instStmt s@Assign{assign_to = [Var{var_ident = lhs}], assign_expr = rhs}
-  | Just stmt <- msum [litAss, callAss, opAss] = [stmt, s]
+  | Just stmt <- msum [litAss, callAss, opAss] = Right [stmt, s]
   where litAss  = getLiteralAssign lhs rhs
         callAss = getCallAssignment lhs rhs
         opAss   = getOpAssignment lhs rhs
 --instStmt s@AugmentedAssign{} = 
 --instStmt s@Decorated{}       = 
-instStmt s@Return{} = [endScope, s]
+instStmt s@Return{} = Right [endScope, s]
 --instStmt s@Try{}             = 
 --instStmt s@Raise{}           = 
 --instStmt s@With{}            = 
-instStmt s@Pass{}     = [s]
-instStmt s@Break{}    = [s]
-instStmt s@Continue{} = [s]
+instStmt s@Pass{}     = Right [s]
+instStmt s@Break{}    = Right [s]
+instStmt s@Continue{} = Right [s]
 --instStmt s@Delete{}          = 
 --instStmt s@StmtExpr{}        = 
 --instStmt s@Global{}          = 
@@ -80,7 +82,7 @@ instStmt s@Continue{} = [s]
 --instStmt s@Assert{}          = 
 --instStmt s@Print{}           = 
 --instStmt s@Exec{}            = 
-instStmt s = error $ "Instrumentation.instStmt called on unsupported statement:\n" ++
+instStmt s = Left $ "Instrumentation.instStmt called on unsupported statement:\n" ++
              render (pretty s)
 
 litAssIdent :: IdentSpan

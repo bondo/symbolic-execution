@@ -12,7 +12,7 @@ mkIdent :: String -> IdentSpan
 mkIdent s = Ident { ident_string = s, ident_annot = SpanEmpty }
 
 mkVar :: IdentSpan -> ExprSpan
-mkVar i = Var i SpanEmpty
+mkVar i = Var { var_ident = i, expr_annot = SpanEmpty }
 
 mkString :: IdentSpan -> ExprSpan
 mkString i = Strings { strings_strings = ["'" ++ ident_string i ++ "'"], expr_annot = SpanEmpty }
@@ -30,6 +30,12 @@ mkIntroScope = error "SymbolicAnnotation.mkIntroScope not implemented"
 endScope :: StatementSpan
 endScope = mkCall (mkIdent "symbolic_return") []
 
+mkAssert :: IdentSpan -> StatementSpan
+mkAssert var = mkCall (mkIdent "symbolic_assert") [mkString var]
+
+mkRefute :: IdentSpan -> StatementSpan
+mkRefute var = mkCall (mkIdent "symbolic_refute") [mkString var]
+
 symbModule :: ModuleSpan -> ModuleSpan
 symbModule (Module m) = Module $ concatMap symbStmt m
 
@@ -40,10 +46,11 @@ symbStmt :: StatementSpan -> [StatementSpan]
 --symbStmt s@For{}             = 
 --symbStmt s@Fun{}             = 
 --symbStmt s@Class{}           = 
---symbStmt s@Conditional{}     = 
-symbStmt s@Assign{} = case msum [litAss, callAss, opAss] of
-  Just stmt -> [stmt, s]
-  Nothing   -> badStatement s
+symbStmt s@Conditional{} | [(sCond@Var{var_ident = i}, sSuite)] <- cond_guards s =
+  [s { cond_guards = [(sCond, mkAssert i : sSuite)]
+     , cond_else = mkRefute i : cond_else s
+     }]
+symbStmt s@Assign{} | Just stmt <- msum [litAss, callAss, opAss] = [stmt, s]
   where lhs = if length (assign_to s) /= 1
               then badStatement s
               else getIdent s . head $ assign_to s
@@ -74,6 +81,9 @@ litAssIdent = mkIdent "symbolic_assign_literal"
 
 callAssIdent :: IdentSpan
 callAssIdent = mkIdent "symbolic_assign_call"
+
+opAssIdent :: IdentSpan
+opAssIdent = mkIdent "symbolic_assign_binop"
 
 getLiteralAssign :: IdentSpan -> ExprSpan -> Maybe (StatementSpan)
 getLiteralAssign i e@Int{}            = Just $ mkCall litAssIdent [mkString i, e]

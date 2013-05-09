@@ -24,7 +24,7 @@ parseNamesInStmt :: String -> Set String
 parseNamesInStmt = getNames parseStmt namesStmts
 
 parseNamesInModule :: String -> Set String
-parseNamesInModule file = getNames parseModule namesModule file
+parseNamesInModule = getNames parseModule namesModule
 
 parseNamesInModuleIO :: String -> IO (Set String)
 parseNamesInModuleIO fname = parseNamesInModule `liftM` readFile fname
@@ -49,7 +49,7 @@ simplifyStmt str = putStrLn $ either (("Error: "++) . show) (prettify . simplify
   where parsed = parseStmt (str ++ "\n") ""
         names = parseNamesInStmt str
         simplify (ast, _) = evalNameGen names $ simplStmts ast
-        prettify stmts = concatMap ((++"\n") . render . pretty) stmts
+        prettify = concatMap ((++"\n") . render . pretty)
 -- > simplifyStmt "if a+4 > b:\n a = b * a + 42\nelif b < 2*a:\n b = 2*a + 2*b + c**4\nelse:\n b = a * (b - 7)"
 
 simplifyModule :: String -> Either String ModuleSpan

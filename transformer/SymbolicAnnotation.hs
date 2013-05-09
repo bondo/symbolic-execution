@@ -85,7 +85,7 @@ callAssIdent = mkIdent "symbolic_assign_call"
 opAssIdent :: IdentSpan
 opAssIdent = mkIdent "symbolic_assign_binop"
 
-getLiteralAssign :: IdentSpan -> ExprSpan -> Maybe (StatementSpan)
+getLiteralAssign :: IdentSpan -> ExprSpan -> Maybe StatementSpan
 getLiteralAssign i e@Int{}            = Just $ mkCall litAssIdent [mkString i, e]
 getLiteralAssign i e@LongInt{}        = Just $ mkCall litAssIdent [mkString i, e]
 getLiteralAssign i e@Float{}          = Just $ mkCall litAssIdent [mkString i, e]
@@ -97,20 +97,19 @@ getLiteralAssign i e@Strings{}        = Just $ mkCall litAssIdent [mkString i, e
 getLiteralAssign i e@UnicodeStrings{} = Just $ mkCall litAssIdent [mkString i, e]
 getLiteralAssign _ _                  = Nothing
 
-getCallAssignment :: IdentSpan -> ExprSpan -> Maybe (StatementSpan)
+getCallAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
 getCallAssignment i e@Call{} | Var{} <- name
-                             , Just strs <- getArguments asString $ call_args e
-                             , Just vars <- getArguments asVar $ call_args e =
+                             , Just strs <- mapM asString $ call_args e
+                             , Just vars <- mapM asVar $ call_args e =
   Just . mkCall callAssIdent $ [mkString i, mkString (var_ident name)] ++ concat (transpose [strs, vars])
-  where getArguments as args = mapM as args
-        asString a@ArgExpr{} | v@Var{} <- arg_expr a = Just . mkString $ var_ident v
+  where asString a@ArgExpr{} | v@Var{} <- arg_expr a = Just . mkString $ var_ident v
         asString _ = Nothing
         asVar a@ArgExpr{} | v@Var{} <- arg_expr a = Just . mkVar $ var_ident v
         asVar _ = Nothing
         name = call_fun e
 getCallAssignment _ _ = Nothing
 
-getOpAssignment :: IdentSpan -> ExprSpan -> Maybe (StatementSpan)
+getOpAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
 getOpAssignment = error "SymbolicAnnotation.getOpAssignment not implemented"
 
 getIdent :: StatementSpan -> ExprSpan -> IdentSpan

@@ -157,22 +157,15 @@ simplStmt s@Class{} = do
   return $ paramStmts ++ [ s{ class_args = params
                             , class_body = bodySuite
                             } ]
-simplStmt s@Conditional{} =
-  if null guards
-  then error "Simplifier.simplStmt called on conditional with no guards"
-  else if null gs
-       -- Only one guard
-       then do (guardStmts, guardVar) <- simplVar guardExpr
-               guardSuite'            <- simplSuite guardSuite
-               elseSuite              <- simplSuite $ cond_else s
-               return $ guardStmts ++ [ s{ cond_guards = [(guardVar, guardSuite')]
-                                         , cond_else   = elseSuite
-                                         } ]
-       -- Many guards
-       else simplStmt s{cond_guards = [g], cond_else = [innerCond]}
-  where guards                         = cond_guards s
-        g@(guardExpr, guardSuite) : gs = guards
-        innerCond                      = s{cond_guards = gs}
+simplStmt s@Conditional{} | [(guardExpr, guardSuite)] <- cond_guards s = do
+  (guardStmts, guardVar) <- simplVar guardExpr
+  guardSuite'            <- simplSuite guardSuite
+  elseSuite              <- simplSuite $ cond_else s
+  return $ guardStmts ++ [ s{ cond_guards = [(guardVar, guardSuite')]
+                            , cond_else   = elseSuite
+                            } ]
+simplStmt s@Conditional{} | (g : gs) <- cond_guards s =
+  simplStmt s{cond_guards = [g], cond_else = [s{cond_guards = gs}]}
 simplStmt s@Assign{} = if length (assign_to s) /= 1
                        then error "Simplifier.simplStmt: Only single LHS assignment supported."
                        else do (lhsStmts, lhsVar)  <- simplVar lhs

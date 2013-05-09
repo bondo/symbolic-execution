@@ -60,8 +60,17 @@ simplifyModule file = case parseModule (file++"\n") "" of
 -- > putPretty $ symbModule mod
 
 simplifyModuleIO :: String -> IO ()
-simplifyModuleIO fname = readFile fname >>= putStrLn . either ("Error: "++) (render . pretty) . simplifyModule
+simplifyModuleIO = moduleIO simplifyModule
 -- > simplifyModuleIO "../interpreter/tests/simple1.py"
+
+annotateModule :: String -> Either String ModuleSpan
+annotateModule file = symbModule `liftM` simplifyModule file
+
+annotateModuleIO :: String -> IO ()
+annotateModuleIO = moduleIO annotateModule
+
+moduleIO :: (String -> Either String ModuleSpan) -> String -> IO ()
+moduleIO fun fname = readFile fname >>= putStrLn . either ("Parse error: "++) (render . pretty) . fun
 
 putPretty :: Pretty a => a -> IO ()
 putPretty = putStrLn . render . pretty

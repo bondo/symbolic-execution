@@ -46,14 +46,13 @@ symbStmt :: StatementSpan -> [StatementSpan]
 --symbStmt s@For{}             = 
 --symbStmt s@Fun{}             = 
 --symbStmt s@Class{}           = 
-symbStmt s@Conditional{} | [(sCond@Var{var_ident = i}, sSuite)] <- cond_guards s =
-  [s { cond_guards = [(sCond, mkAssert i : sSuite)]
-     , cond_else = mkRefute i : cond_else s
+symbStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
+  [s { cond_guards = [(cond, mkAssert i : suite)]
+     , cond_else = mkRefute i : els
      }]
-symbStmt s@Assign{assign_to = [target], assign_expr = rhs}
+symbStmt s@Assign{assign_to = [Var{var_ident = lhs}], assign_expr = rhs}
   | Just stmt <- msum [litAss, callAss, opAss] = [stmt, s]
-  where lhs = getIdent s target
-        litAss  = getLiteralAssign lhs rhs
+  where litAss  = getLiteralAssign lhs rhs
         callAss = getCallAssignment lhs rhs
         opAss   = getOpAssignment lhs rhs
 --symbStmt s@AugmentedAssign{} = 
@@ -72,7 +71,8 @@ symbStmt s@Continue{} = [s]
 --symbStmt s@Assert{}          = 
 --symbStmt s@Print{}           = 
 --symbStmt s@Exec{}            = 
-symbStmt s = badStatement s
+symbStmt s = error $ "SymbolicAnnotation.symbStmt called on unsupported statement: " ++
+             render (pretty s)
 
 litAssIdent :: IdentSpan
 litAssIdent = mkIdent "symbolic_assign_literal"
@@ -106,11 +106,3 @@ getCallAssignment _ _ = Nothing
 
 getOpAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
 getOpAssignment = error "SymbolicAnnotation.getOpAssignment not implemented"
-
-getIdent :: StatementSpan -> ExprSpan -> IdentSpan
-getIdent _ Var{var_ident = i} = i
-getIdent s _                  = badStatement s
-
-badStatement s = error $
-                 "SymbolicAnnotation.symbStmt called on unsupported statement: " ++
-                 render (pretty s)

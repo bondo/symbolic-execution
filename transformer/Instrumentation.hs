@@ -5,6 +5,7 @@ module Instrumentation (instStmt, instModule) where
 import Control.Monad (msum, liftM)
 import "mtl" Control.Monad.Error ()
 import Data.List (transpose)
+import Data.Maybe (maybeToList)
 
 import Language.Python.Common.AST
 import Language.Python.Common.Pretty (pretty, render)
@@ -30,8 +31,8 @@ mkCall i es = StmtExpr { stmt_expr = expr, stmt_annot = SpanEmpty }
 mkIntroScope :: [IdentSpan] -> StatementSpan
 mkIntroScope = mkCall (mkIdent "symbolic_scope") . map mkString
 
-endScope :: StatementSpan
-endScope = mkCall (mkIdent "symbolic_return") []
+mkReturn :: Maybe IdentSpan -> StatementSpan
+mkReturn = mkCall (mkIdent "symbolic_return") . map mkString . maybeToList
 
 mkAssert :: IdentSpan -> StatementSpan
 mkAssert var = mkCall (mkIdent "symbolic_assert") [mkString var]
@@ -70,7 +71,8 @@ instStmt s@Assign{assign_to = [Var{var_ident = lhs}], assign_expr = rhs}
         opAss   = getOpAssignment lhs rhs
 --instStmt s@AugmentedAssign{} = 
 --instStmt s@Decorated{}       = 
-instStmt s@Return{} = Right [endScope, s]
+instStmt s@Return{return_expr = Just Var{var_ident = i}} = Right [mkReturn $ Just i, s]
+instStmt s@Return{return_expr = Nothing}                 = Right [mkReturn $ Nothing, s]
 --instStmt s@Try{}             = 
 --instStmt s@Raise{}           = 
 --instStmt s@With{}            = 

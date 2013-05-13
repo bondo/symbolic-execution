@@ -26,15 +26,105 @@ tmp_2 = b * tmp_1
 \end{verbatim}
 and the expression \verb!a + tmp_2!
 
-\subsection*{Normalizing \texttt{if-elif-else}}
+\subsection*{Normalizing {\tt if-elif-else}}
+Assume we have a function $$simplifyToVariable: Expression \rightarrow
+[Statement] \times Variable$$ that transforms an arbitrary expression
+into a list of normalized statements, and a variable containing the
+final value of the expression.
+
+If we now have that $(stmts, var) = simplifyToVariable(t1)$, we can
+normalize
+\begin{verbatim}
+if t1:
+  S1
+elif t2:
+  S2
+elif t3:
+  S3
+else
+  S4
+\end{verbatim}
+by first transforming it into
+\begin{verbatim}
+stmts
+if var:
+  S1
+else
+  if t2:
+    S2
+  elif t3:
+    S3
+  else
+    S4
+\end{verbatim}
+and then recursing into the two branches.
 
 \subsection*{Normalizing $\lambda$-expressions}
+Transform to named functions.
+
+\subsection*{Normalizing {\tt while}}
+We only have support for {\tt while} where the condition is a single
+variable. To support arbitrary conditions we would have to precede the
+whole {\tt while} statement and all matching inner {\tt continue}
+statements with the list of statements calculating the condition.
 
 \subsection*{Experimental verification}
 
 \section*{Instrumentation}
+We instrumrnt the python code by inserting calls to our python
+instrumentation library into the source. For example, the program
+\begin{verbatim}
+def foo(x):
+    return 2*x
+\end{verbatim}
+is first normalized to
+\begin{verbatim}
+def foo(x):
+    tmp_1 = 2
+    tmp_2 = tmp_1 * x
+    return tmp_2
+\end{verbatim}
+and then after inserting calls to our instrumentation code it becomes
+\begin{verbatim}
+def foo(x):
+    symbolic_scope('x')
+    symbolic_assign_literal('tmp_1', 2)
+    tmp_1 = 2
+    symbolic_assign_binop('tmp_2', '*', 'tmp_1', 'x')
+    tmp_2 = tmp_1 * x
+    symbolic_return('tmp_2')
+    return tmp_2
+\end{verbatim}
+
+\begin{description}
+  \item[Functions:] A call to {\tt symbolic\_scope} is inserted as the
+    first statement of the function body.
+  \item[{\tt while} loops:] An {\tt assert} is prepended to the body.
+  \item[Conditionals:] In every {\tt then} branch an {\tt assert}
+    statement is prepended. In every {\tt else} branch a {\tt refute}
+    statement is prepended.
+  \item[Assignment] We distinguish three kinds of assignment: literal,
+    call and binop, resulting in calls to {\tt
+      symbolic\_assign\_literal}, {\tt symbolic\_assign\_call} and
+    {\tt symbolic\_assign\_binop} respectively. A literal assignment
+    is when the right-hand-side is a literal value, e.g. a number or a
+    string constant. A call assignment is an assignment where the
+    right-hand-side is a function call. A binop assignment is an
+    assignment where the right-hand-side is a binary operation on two
+    variables.
+  \item[{\tt return} statements:] Preceed the statement with a call to
+    {\tt symbolic\_return}. If a variable is returned (after
+    normalization either a variable or nothing is returned), pass the
+    name of that variable as a string to {\tt symbolic\_return}.
+  \item[{\tt pass}, {\tt break} and {\tt continue} statements:] Leave
+    them be.
+\end{description}
 
 \section*{Related work}
+
+\subsection*{DART}
+
+\subsection*{Apollo}
 
 \section*{Future work}
 

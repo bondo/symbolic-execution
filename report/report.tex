@@ -33,7 +33,7 @@ into a list of normalized statements, and a variable containing the
 final value of the expression.
 
 If we now have that $(stmts, var) = simplifyToVariable(t1)$, we can
-normalize
+normalize an \verb!if!-\verb!elif! chain
 \begin{verbatim}
 if t1:
   S1
@@ -44,7 +44,8 @@ elif t3:
 else
   S4
 \end{verbatim}
-by first transforming it into
+by first transforming it into a single \verb!if!-statement with the rest of the
+\verb!if!-\verb!elif! chain in the \verb!else! clause
 \begin{verbatim}
 stmts
 if var:
@@ -60,7 +61,9 @@ else
 and then recursing into the two branches.
 
 \subsection*{Normalizing $\lambda$-expressions}
-Transform to named functions.
+All $\lambda$-expressions are transformed into named (local) functions. The body
+of the $\lambda$-expression is an expression, but when normalized it may require
+a number of preceding statements. Thus one cannot use a $\lambda$-expression.
 
 \subsection*{Normalizing {\tt while}}
 We only have support for {\tt while} where the condition is a single

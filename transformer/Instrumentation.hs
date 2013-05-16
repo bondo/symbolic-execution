@@ -82,7 +82,8 @@ instStmt s@Pass{}     = Right [s]
 instStmt s@Break{}    = Right [s]
 instStmt s@Continue{} = Right [s]
 --instStmt s@Delete{}          = 
---instStmt s@StmtExpr{}        = 
+instStmt s@StmtExpr{stmt_expr = e} | Just (fun, args) <- getFunction e =
+  Right [mkCall (mkIdent "symbolic_call") $ fun : args, s]
 --instStmt s@Global{}          = 
 --instStmt s@NonLocal{}        = 
 --instStmt s@Assert{}          = 
@@ -112,13 +113,23 @@ getLiteralAssign i e@Strings{}        = Just $ mkCall litAssIdent [mkString i, e
 getLiteralAssign i e@UnicodeStrings{} = Just $ mkCall litAssIdent [mkString i, e]
 getLiteralAssign _ _                  = Nothing
 
-getCallAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
-getCallAssignment i Call{call_fun = Var{var_ident = fun}, call_args = args}
+getFunction ::
+  ExprSpan -- Normalized function call
+  -> Maybe (   -- Given f(a,b,c):
+    ExprSpan,  --   "f"
+    [ExprSpan] --   ["a",a,"b",b,"c",c]
+    )
+getFunction Call{call_fun = Var{var_ident = fun}, call_args = args}
   | Just strs <- mapM (argTo mkString) args
   , Just vars <- mapM (argTo mkVar) args =
-  Just . mkCall callAssIdent $ [mkString i, mkString fun] ++ concat (transpose [strs, vars])
+  Just (mkString fun, concat $ transpose [strs, vars])
   where argTo to ArgExpr{arg_expr = Var{var_ident = ident}} = Just $ to ident
         argTo _ _ = Nothing
+getFunction _ = Nothing
+
+getCallAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan
+getCallAssignment i e | Just (fun, args) <- getFunction e =
+  Just . mkCall callAssIdent $ [mkString i, fun] ++ args
 getCallAssignment _ _ = Nothing
 
 getOpAssignment :: IdentSpan -> ExprSpan -> Maybe StatementSpan

@@ -17,4 +17,4 @@ main = do
   case instrumentModule contents of
     Left err  -> ioError . userError $ "Program transformation failed: " ++ err
     Right mod -> writeFile outfile  . render . pretty $ mod
--- > ghc Main.hs && ./Main tests/simple1.py tests/simple1.out.py && echo 'Success! Program transformed.'
+-- > runhaskell Main.hs tests/simple1.py tests/simple1.out.py && echo 'Success! Program transformed.'

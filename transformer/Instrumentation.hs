@@ -60,10 +60,12 @@ instStmt s@Fun{fun_args = params, fun_result_annotation = Nothing, fun_body = bo
         getIdent _  = Nothing
         buildStmt idents b = [s{fun_body = mkIntroScope idents : b}]
 --instStmt s@Class{}           = 
-instStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, suite)], cond_else = els} =
-  Right [s { cond_guards = [(cond, mkAssert i : suite)]
-           , cond_else = mkRefute i : els
-           }]
+instStmt s@Conditional{cond_guards = [(cond@Var{var_ident = i}, thenSuite)], cond_else = elseSuile} =
+  do thenSuite' <- instSuite thenSuite
+     elseSuile' <- instSuite elseSuile
+     Right [s { cond_guards = [(cond, mkAssert i : thenSuite')]
+              , cond_else = mkRefute i : elseSuile'
+              }]
 instStmt s@Assign{assign_to = [Var{var_ident = lhs}], assign_expr = rhs}
   | Just stmt <- msum [litAss, callAss, opAss] = Right [stmt, s]
   where litAss  = getLiteralAssign lhs rhs

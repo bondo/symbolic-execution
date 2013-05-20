@@ -88,6 +88,7 @@ class PathCondition:
             for c, _, _ in self.pc: cond = And(cond, c)
             return (cond, path)
 
+
 env = None
 pc = PathCondition()
 lits = set()
@@ -165,11 +166,10 @@ def get_transformed_path(path):
 
     return outpath
 
-
 def solver_with_lits():
     global lits
     solver = Solver()
-    for literal in list(lits):
+    for literal in lits:
         lit = Int(str(literal))
         solver.add(lit == literal)
     return solver
@@ -181,9 +181,9 @@ def model_next():
     if nextpath is None:
         print('No more execution paths found')
         return None
+    print('Next execution path:', nextpath)
 
     solver = solver_with_lits()
-    print('Next execution path:', nextpath)
     solver.add(cond)
     print('Corresponding solver:', solver)
 
@@ -200,7 +200,6 @@ def model_next():
         except Z3Exception:
             print('Model not found')
             return model_next()
-        
 
 def main():
     global env, pc
@@ -230,27 +229,18 @@ def main():
             type, e, trace = exc_info()
             trace = '\n  '.join(['%s line %d in function %s:\n    %s' % info for info in extract_tb(trace)[1:]])
 
-
         formals = env.get_formals()
         if num_args != len(formals):
             raise InstrumentationException('Something went bad: num_args != len(formals)')
 
-        if trace is None:
-            print('No error occurs when %s = %s.' % (str(formals), str(arg_vals)))
-        else:
-            print('When %s = %s a %s exception is raised: %s\nTraceback:\n  %s' % \
-                      (str(formals), str(arg_vals), type.__name__, e, trace))
-
-        formals = env.get_formals()
-        if num_args != len(formals):
-            raise InstrumentationException('Something went bad: num_args != len(formals)')
+        if trace is None: print('No error occurs when %s = %s.' % (str(formals), str(arg_vals)))
+        else: print('When %s = %s a %s exception is raised: %s\nTraceback:\n  %s' % \
+                        (str(formals), str(arg_vals), type.__name__, e, trace))
 
         print('Path just executed: ', pc.path())
-
         pc.see()
         model = model_next()
-        if model is None:
-            break
+        if model is None: break
         else:
             print('Model:', model, '\n')
             arg_vals = tuple([model[Int(arg)].as_long() for arg in formals])

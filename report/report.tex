@@ -74,6 +74,8 @@ statements with the list of statements calculating the condition.
 \subsection*{Experimental verification}
 
 \section*{Instrumentation}
+
+\subsection*{Source code transformation}
 We instrumrnt the python code by inserting calls to our python
 instrumentation library into the source. For example, the program
 \begin{verbatim}
@@ -122,6 +124,50 @@ def foo(x):
   \item[{\tt pass}, {\tt break} and {\tt continue} statements:] Leave
     them be.
 \end{description}
+
+\subsection*{Execution}
+Given that \verb|~/symbolic-execution/transformer/tests/pythagoras.py| contains
+\begin{verbatim}
+def foo(a, b, c):
+    if a*a + b*b == c*c and a > 0:
+        sum = a+b+c
+        if 0 < sum and sum < 15 and a < b and b < c:
+            res = sum / (c - b - a + 2)
+\end{verbatim}
+
+the current state of out work yields the following output
+
+\begin{verbatim}
+~/symbolic-execution/instrumentation$ python3 instrument.py
+Transform /home/bondo/symbolic-execution/transformer/tests/pythagoras.py.
+Transformation successful.
+
+No error occurs when ('a', 'b', 'c') = (0, 0, 0).
+Path just executed:  (('tmp_8', False),)
+Next execution path: (('tmp_8', True),)
+Corresponding solver: [0 == 0, Not(Not(And(a*a + b*b == c*c, a > 0)))]
+Constraints are satisfiable
+Model: [c = -5, b = -4, a = 3, 0 = 0] 
+
+No error occurs when ('a', 'b', 'c') = (3, -4, -5).
+Path just executed:  (('tmp_8', True), ('tmp_18', False))
+Next execution path: (('tmp_8', True), ('tmp_18', True))
+Corresponding solver: [0 == 0,
+ 15 == 15,
+ And(Not(Not(And(And(And(0 < a + b + c, a + b + c < 15),
+                     a < b),
+                 b < c))),
+     And(a*a + b*b == c*c, a > 0))]
+Constraints are satisfiable
+Model: [c = 5, b = 4, a = 3, 15 = 15, 0 = 0] 
+
+When ('a', 'b', 'c') = (3, 4, 5) a ZeroDivisionError exception is raised: division by zero
+Traceback:
+  /home/bondo/symbolic-execution/transformer/tests/pythagoras.out.py line 54 in function foo:
+    res = sum / tmp_22
+Path just executed:  (('tmp_8', True), ('tmp_18', True))
+No more execution paths found
+\end{verbatim}
 
 \section*{Related work}
 

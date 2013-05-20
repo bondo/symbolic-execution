@@ -117,6 +117,12 @@ def symbolic_call(fun, *vars):
 #   print('symbolic_call:', fun, '<-', vars)
 builtins.symbolic_call = symbolic_call
 
+def symbolic_assign_call(target, fun, *vars):
+    global env, pc
+#   print('symbolic_assign_call:', target, '=', fun, '<-', vars)
+    raise InstrumentationException('symbolic_assign_call not implemented')
+builtins.symbolic_call = symbolic_call
+
 def symbolic_assign_literal(target, literal):
     global env, pc, lits
 #   print('symbolic_assign_literal:', target, '=', literal)
@@ -132,12 +138,15 @@ def symbolic_assign_binop(target, op, left, right):
 #   print('symbolic_assign_binop:', target, '=', left, op, right)
     l = env.get(left)
     r = env.get(right)
-    if op == '>': env.set(target, l > r)
+    if op == '<': env.set(target, l < r)
+    elif op == '>': env.set(target, l > r)
+    elif op == '==': env.set(target, l == r)
     elif op == '<=': env.set(target, l <= r)
+    elif op == 'and': env.set(target, And(l, r))
     elif op == '+': env.set(target, l + r)
+    elif op == '-': env.set(target, l - r)
     elif op == '/': env.set(target, l / r)
     elif op == '*': env.set(target, l * r)
-    elif op == '==': env.set(target, l == r)
     else: raise InstrumentationException('Unsupported binop: ' + op)
 builtins.symbolic_assign_binop = symbolic_assign_binop
 
@@ -204,8 +213,8 @@ def model_next():
 def main():
     global env, pc
 
-    num_args = 2
-    path = get_transformed_path('../transformer/tests/simple4.py')
+    num_args = 3
+    path = get_transformed_path('../transformer/tests/pythagoras.py')
     if path is None: return
 
     bar = imp.load_source('module.name', path)

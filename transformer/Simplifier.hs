@@ -95,6 +95,7 @@ simplExpr e@Call{call_fun = fun, call_args = args} = do
 -- Subscript
 -- SlicedExpr
 -- CondExpr
+-- BUG: 3<2<1 should be False but is parsed as (3<2)<1 and thus becomes True
 simplExpr e@BinaryOp{left_op_arg = left, right_op_arg = right} = do
   (leftStmts, leftVar)   <- simplVar left
   (rightStmts, rightVar) <- simplVar right

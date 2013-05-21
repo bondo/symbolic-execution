@@ -71,7 +71,20 @@ variable. To support arbitrary conditions we would have to precede the
 whole {\tt while} statement and all matching inner {\tt continue}
 statements with the list of statements calculating the condition.
 
+\subsection*{Semantic deviation}
+\paragraph{The short-circuit semantics of boolean operators are ignored;}
+  instead expressions are always fully evaluated. This could be fixed
+  at the cost of some output complexity, e.g. \verb|if a or b: S| should
+  be normalized to
+\begin{verbatim}
+tmp_1 = a
+tmp_2 = not tmp_1
+if tmp_2: tmp_1 = b
+if tmp_1: S
+\end{verbatim}
+
 \subsection*{Experimental verification}
+Drop section?
 
 \section*{Instrumentation}
 
@@ -126,6 +139,18 @@ def foo(x):
 \end{description}
 
 \subsection*{Execution}
+
+\subsubsection*{Overview}
+
+\begin{itemize}
+\item Inject functions into \verb|builtins|
+\item Invoke the code under test from \verb|instrument.py|
+\item Assume all errors are uncaught exceptions
+\item It would be nice to add constraints that force division by zero
+\end{itemize}
+
+\subsubsection*{Example}
+
 Given that \verb|~/symbolic-execution/transformer/tests/pythagoras.py| contains
 \begin{verbatim}
 def foo(a, b, c):
@@ -168,6 +193,27 @@ Traceback:
 Path just executed:  (('tmp_8', True), ('tmp_18', True))
 No more execution paths found
 \end{verbatim}
+
+Notice that constraints like \verb|15 == 15| are added to the solver
+-- this is actually a variable on the left and an integer on the
+right. When assigning an integer constant as a symbolic value, we
+instead assign the variable with that integer as the name. This allows
+us to completely rely on Z3's symbolic representation of values. This
+might change when we introduce symbolic type coercion and primitive
+types other than integers and booleans.
+
+\subsubsection*{Handeling path conditions}
+\begin{itemize}
+\item How we remember executed paths
+\item How we find the next
+\end{itemize}
+
+\subsubsection*{Handeling symbolic environments}
+\begin{itemize}
+\item Naming arguments: Delay naming until inside the functions where
+  the formals have names.
+\item Scoping
+\end{itemize}
 
 \section*{Related work}
 

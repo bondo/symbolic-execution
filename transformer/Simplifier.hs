@@ -95,7 +95,12 @@ simplExpr e@Call{call_fun = fun, call_args = args} = do
 -- Subscript
 -- SlicedExpr
 -- CondExpr
--- BUG: 3<2<1 should be False but is parsed as (3<2)<1 and thus becomes True
+simplExpr e@BinaryOp{operator = op, left_op_arg  = BinaryOp{operator = op'}}
+  | isCmpOp op && isCmpOp op' = throwError $
+  "Simplifier.simplExpr does not support chained comparison:\n" ++ render (pretty e)
+simplExpr e@BinaryOp{operator = op, right_op_arg = BinaryOp{operator = op'}}
+  | isCmpOp op && isCmpOp op' = throwError $
+  "Simplifier.simplExpr does not support chained comparison:\n" ++ render (pretty e)
 simplExpr e@BinaryOp{left_op_arg = left, right_op_arg = right} = do
   (leftStmts, leftVar)   <- simplVar left
   (rightStmts, rightVar) <- simplVar right
@@ -244,6 +249,20 @@ assignOpToBinOp BinXorAssign{}     = makeBinOp Xor
 assignOpToBinOp LeftShiftAssign{}  = makeBinOp ShiftLeft
 assignOpToBinOp RightShiftAssign{} = makeBinOp ShiftRight
 assignOpToBinOp FloorDivAssign{}   = makeBinOp FloorDivide
+
+isCmpOp :: OpSpan -> Bool
+isCmpOp LessThan{}          = True
+isCmpOp GreaterThan{}       = True
+isCmpOp Equality{}          = True
+isCmpOp GreaterThanEquals{} = True
+isCmpOp LessThanEquals{}    = True
+isCmpOp NotEquals{}         = True
+isCmpOp NotEqualsV2{}       = True
+isCmpOp Is{}                = True
+isCmpOp IsNot{}             = True
+isCmpOp In{}                = True
+isCmpOp NotIn{}             = True
+isCmpOp _                   = False
 
 simplModule :: ModuleSpan -> NameGen ModuleSpan
 simplModule (Module ss) = Module `liftM` simplStmts ss

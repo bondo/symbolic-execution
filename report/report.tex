@@ -203,10 +203,22 @@ might change when we introduce symbolic type coercion and primitive
 types other than integers and booleans.
 
 \subsubsection*{Handeling path conditions}
-\begin{itemize}
-\item How we remember executed paths
-\item How we find the next
-\end{itemize}
+We store executed paths as a list of tuples containing
+$$(symbolic\_boolean\_condition, variable\_name, assert/refute)$$
+Notice that because of the normalization, an execution path is
+uniquely determined by the reduced list of $(name, is\_assert)$
+tuples.
+
+We find the next path to explore by this algorithm:
+\begin{verbatim}
+def find_next_path():
+    if empty(): return None
+    flip_last_condition()
+    if seen_before():
+        remove_last_condition()
+        return find_next_path()
+    return path()
+\end{verbatim}
 
 \subsubsection*{Handeling symbolic environments}
 \begin{itemize}

@@ -2,7 +2,6 @@ module Main (main) where
 
 import Control.Monad (when)
 import System.Environment (getArgs)
-import System.IO.Error (ioError, userError)
 
 import Language.Python.Common.Pretty (pretty, render)
 
@@ -15,6 +14,6 @@ main = do
   let [infile, outfile] = args
   contents <- readFile infile
   case instrumentModule contents of
-    Left err  -> ioError . userError $ "Program transformation failed: " ++ err
-    Right mod -> writeFile outfile  . render . pretty $ mod
+    Left e  -> ioError . userError $ "Program transformation failed: " ++ e
+    Right m -> writeFile outfile  . render . pretty $ m
 -- > runhaskell Main.hs tests/simple1.py tests/simple1.out.py && echo 'Success! Program transformed.'

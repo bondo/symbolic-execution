@@ -235,7 +235,7 @@ def main():
             print("InstrumentationException:", ex)
             break
         except:
-            type, e, trace = exc_info()
+            type, msg, trace = exc_info()
             trace = '\n  '.join(['%s line %d in function %s:\n    %s' % info for info in extract_tb(trace)[1:]])
 
         formals = env.get_formals()
@@ -244,7 +244,7 @@ def main():
 
         if trace is None: print('No error occurs when %s = %s.' % (str(formals), str(arg_vals)))
         else: print('When %s = %s a %s exception is raised: %s\nTraceback:\n  %s' % \
-                        (str(formals), str(arg_vals), type.__name__, e, trace))
+                        (str(formals), str(arg_vals), type.__name__, msg, trace))
 
         print('Path just executed: ', pc.path())
         pc.see()

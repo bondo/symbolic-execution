@@ -35,6 +35,7 @@
 \pagestyle{plain}
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
+\todo{\dots}
 
 \tableofcontents
 \pagenumbering{arabic}
@@ -45,14 +46,22 @@
 \chapter{Introduction}
 \label{ch:intro}
 
-Symbolic execution is a way to prove existence of errors in programs. 
+Symbolic execution is a way to prove existence of errors in programs.
+
+\todo{Motivation: Dynamic languages are hard to analyze statically, as
+  faw as we know no one has implemented symbolic execution for Python
+  before}
+
+\section{Simple example}
 \todo{\dots}
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\chapter{Goals}
-\label{ch:goals}
-\todo{\dots}
+\section{Project goals}
+\begin{itemize}
+  \item \todo{Find out about symbolic execution and how it can be
+    applied to Python}
+  \item \todo{See if this strategy of source level transformations is
+    a fruitful}
+\end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -61,8 +70,23 @@ Symbolic execution is a way to prove existence of errors in programs.
 
 \begin{itemize}
   \item \todo{Implementation strategy / general design decisions}
+  \item \todo{Diagram explaining how the different program components
+    fit together}
+  \item \todo{Link to Github}
   \item \todo{Report structure}
 \end{itemize}
+
+The normalization and the insertion of instrumentation code is
+implemented in Haskell \todo{Why?}. We use the \verb|Language.Python|
+package to parse and pretty-print Python code.
+
+For the actual symbolic execution, we have written a library/wrapper
+in Python. We use Microsoft's SMT solver Z3 to solve constraints,
+because it has a simple Python interface and can handle quite complex
+constraints.
+
+
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -80,10 +104,11 @@ Symbolic execution is a way to prove existence of errors in programs.
 \chapter{Normalization}
 \label{ch:norm}
 
-We do a normalization in which statements and expressions are transformed into
-\emph{atomic actions}. For example, expressions are transformed into a single
-action on local variables and a list of statements that assign the value of the
-subexpressions into corresponding variables.
+We do a normalization in which statements and expressions are
+transformed into \emph{atomic actions}. For example, expressions are
+transformed into a single action on local variables and a list of
+statements that assign the value of the subexpressions into
+corresponding variables. \todo{Elaborate}
 
 Example: \verb!a + b * 4! is transformed into the following list of
 preceding statements
@@ -96,12 +121,13 @@ and the expression \verb!a + tmp_2!
 \section{Supported language}
 For now, only a subset of Python 3 is supported. This section will
 list supported/unsupported expression and statement AST nodes.
-\todo{This would probably be nicer to read this as a BNF}
+\todo{This would probably be nicer to read as a BNF}
 
 \subsection{Supported expressions}
 \begin{description}
-  \item[Var, Int, LongInt, Float, Imaginary, Bool, Tuple, List and
-    Set:] Literals of the obvious kind.
+  \item[Var:] Variables
+  \item[Int, LongInt, Float, Imaginary, Bool, Tuple, List and Set:]
+    Literals of the obvious kind.
   \item[None:] The \verb|None| literal.
   \item[Ellipsis:] The \verb|Ellipsis| literal.
   \item[ByteStrings, Strings and UnicodeStrings:] String literals.
@@ -221,9 +247,10 @@ if tmp_1: S
 \chapter{Instrumentation}
 \label{ch:instumentation}
 
-\section{Source code transformation}
-We instrumrnt the python code by inserting calls to our python
-instrumentation library into the source. For example, the program
+We instrument the python code by inserting calls to our python
+library into the source.
+
+Example: The program
 \begin{verbatim}
 def foo(x):
     return 2*x
@@ -246,6 +273,11 @@ def foo(x):
     symbolic_return('tmp_2')
     return tmp_2
 \end{verbatim}
+
+\todo{Add example with branching}
+
+\section{Transformations}
+\todo{What is this}
 
 \begin{description}
   \item[Functions:] A call to {\tt symbolic\_scope} is inserted as the
@@ -271,18 +303,20 @@ def foo(x):
     them be.
 \end{description}
 
-\section{Execution}
+\section{Supported language}
+\todo{\dots}
 
-\subsection{Overview}
+\chapter{Symbolic execution}
+
+\section{Overview}
 
 \begin{itemize}
-\item Inject functions into \verb|builtins|
-\item Invoke the code under test from \verb|instrument.py|
-\item Assume all errors are uncaught exceptions
-\item It would be nice to add constraints that force division by zero
+\item \todo{Inject functions into \verb|builtins|}
+\item \todo{Invoke the code under test from \verb|instrument.py|}
+\item \todo{Assume all errors are uncaught exceptions}
 \end{itemize}
 
-\subsection{Example}
+\section{Example}
 
 Given that \verb|~/symbolic-execution/transformer/tests/pythagoras.py| contains
 \begin{verbatim}
@@ -319,9 +353,11 @@ Corresponding solver: [0 == 0,
 Constraints are satisfiable
 Model: [c = 5, b = 4, a = 3, 15 = 15, 0 = 0] 
 
-When ('a', 'b', 'c') = (3, 4, 5) a ZeroDivisionError exception is raised: division by zero
+When ('a', 'b', 'c') = (3, 4, 5) a ZeroDivisionError exception is
+        raised: division by zero
 Traceback:
-  /home/bondo/symbolic-execution/transformer/tests/pythagoras.out.py line 54 in function foo:
+  /home/bondo/symbolic-execution/transformer/tests/pythagoras.out.py
+        line 54 in function foo:
     res = sum / tmp_22
 Path just executed:  (('tmp_8', True), ('tmp_18', True))
 No more execution paths found
@@ -333,14 +369,15 @@ right. When assigning an integer constant as a symbolic value, we
 instead assign the variable with that integer as the name. This allows
 us to completely rely on Z3's symbolic representation of values. This
 might change when we introduce symbolic type coercion and primitive
-types other than integers and booleans.
+types other than integers and booleans. \todo{Explain output more?}
 
-\subsection{Handeling path conditions}
-We store executed paths as a list of tuples containing
-$$(symbolic\_boolean\_condition, variable\_name, assert/refute)$$
+\section{Handeling path conditions}
+We store executed paths as a list of tuples containing \\
+\verb|(symbolic_boolean_condition, variable_name, assert/refute)|.
+
 Notice that because of the normalization, an execution path is
-uniquely determined by the reduced list of $(name, is\_assert)$
-tuples.
+uniquely determined by the reduced list of \verb|(name, is_assert)|
+tuples. \todo{Why?}
 
 We find the next path to explore by this algorithm:
 \begin{verbatim}
@@ -353,11 +390,13 @@ def find_next_path():
     return path()
 \end{verbatim}
 
-\subsection{Handeling symbolic environments}
+\todo{A few words about the algorithm}
+
+\section{Handeling symbolic environments}
 \begin{itemize}
-\item Naming arguments: Delay naming until inside the functions where
-  the formals have names.
-\item Scoping
+\item \todo{Naming arguments: Delay naming until inside the functions
+  where the formals have names. Why name stuff?}
+\item \todo{Scoping?}
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -366,8 +405,20 @@ def find_next_path():
 
 \begin{itemize}
   \item Nice diagram explaining the normalization in detail.
-  \item BNF of supported language.
-  \item Experimental verification of our normalization.
+  \item BNF of supported language. Both for the normalization and the
+    instrumentation phase.
+  \item Bound execution of client code, either with a timeout or by
+    the number of symbolic assertions made.
+  \item Z3 can theoretically go into an infinite loop (under which
+    conditions?), so set a timeout.
+  \item Implement function calls in the instrumentation, both for
+    local and foreign (library or external, not C) functions.
+  \item Add instrumentation support for more types. First bool and
+    floating point, then complex numbers, then tuples, then arrays and
+    strings.
+  \item Fall back on concrete values when Z3 fails.
+  \item It would be nice to add constraints that force division by
+    zero when possible.
 \end{itemize}
 
 \section{\LaTeX{} stuff}

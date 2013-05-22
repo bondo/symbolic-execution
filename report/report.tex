@@ -50,7 +50,7 @@
 Symbolic execution is a way to prove existence of errors in programs.
 
 \todo{Motivation: Dynamic languages are hard to analyze statically, as
-  faw as we know no one has implemented symbolic execution for Python
+  far as we know no one has implemented symbolic execution for Python
   before}
 
 \section{Simple example}
@@ -73,7 +73,7 @@ Symbolic execution is a way to prove existence of errors in programs.
   \item \todo{Implementation strategy / general design decisions}
   \item \todo{Diagram explaining how the different program components
     fit together}
-  \item \todo{Link to Github}
+  \item \todo{Link to GitHub}
   \item \todo{Report structure}
   \item \todo{We started out by implementing an interpreter...}
 \end{itemize}
@@ -134,8 +134,8 @@ list supported/unsupported expression and statement AST nodes.
   \item[Ellipsis:] The \verb|Ellipsis| literal.
   \item[ByteStrings, Strings and UnicodeStrings:] String literals.
   \item[Call:] Function calls. This does not include method calls,
-    which are represented as a BinOp with operator Dot. This is also
-    supported, though.
+    which are represented as a BinaryOp with operator Dot. This is
+    also supported, though.
   \item[BinaryOp:] The application of a binary operator. Chained
     comparisons are not supported yet.
   \item[UnaryOp:] The application of a unary operator.
@@ -163,7 +163,7 @@ list supported/unsupported expression and statement AST nodes.
   \item[For:] For loops.
   \item[Fun:] Function declarations.
   \item[Class:] Class declarations.
-  \item[Conditional:] \verb|if|-\verb|elif|-\verb|else| clains.
+  \item[Conditional:] \verb|if|-\verb|elif|-\verb|else| chains.
   \item[Assign:] Normal assignment.
   \item[AugmentedAssign:] Assignments like \verb|a += b|.
   \item[Return, Pass, Break, Continue, Global, NonLocal and Assert:] Statements of the same name.
@@ -297,7 +297,7 @@ def foo(x):
     right-hand-side is a function call. A binop assignment is an
     assignment where the right-hand-side is a binary operation on two
     variables.
-  \item[{\tt return} statements:] Preceed the statement with a call to
+  \item[{\tt return} statements:] Precede the statement with a call to
     {\tt symbolic\_return}. If a variable is returned (after
     normalization either a variable or nothing is returned), pass the
     name of that variable as a string to {\tt symbolic\_return}.
@@ -330,7 +330,7 @@ def foo(a, b, c):
             res = sum / (c - b - a + 2)
 \end{verbatim}
 
-the current state of out work yields the following output
+the current state of our work yields the following output
 
 \begin{verbatim}
 ~/symbolic-execution/instrumentation$ python3 instrument.py
@@ -374,7 +374,7 @@ us to completely rely on Z3's symbolic representation of values. This
 might change when we introduce symbolic type coercion and primitive
 types other than integers and booleans. \todo{Explain output more?}
 
-\section{Handeling path conditions}
+\section{Handling path conditions}
 We store executed paths as a list of tuples containing \\
 \verb|(symbolic_boolean_condition, variable_name, assert/refute)|.
 
@@ -395,7 +395,7 @@ def find_next_path():
 
 \todo{A few words about the algorithm}
 
-\section{Handeling symbolic environments}
+\section{Handling symbolic environments}
 \begin{itemize}
 \item \todo{Naming arguments: Delay naming until inside the functions
   where the formals have names. Why name stuff?}

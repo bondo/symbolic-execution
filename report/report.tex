@@ -1,17 +1,84 @@
-\documentclass[a4paper]{article}
+\documentclass[11pt]{report}
+%\documentclass[twoside,11pt,openright]{report}
+
+\usepackage[utf8]{inputenc}
+\usepackage[american]{babel}
+\usepackage{a4}
+\usepackage{latexsym}
+\usepackage{amssymb}
+\usepackage{amsmath}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{color}
+\usepackage{datetime}
+
+\renewcommand*\ttdefault{txtt}
+
+\newcommand{\todo}[1]{{\color[rgb]{.5,0,0}\textbf{$\blacktriangleright$#1$\blacktriangleleft$}}}
+
 \begin{document}
 
-\section*{Introduction}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pagestyle{empty} 
+\pagenumbering{roman} 
+\vspace*{\fill}\noindent{\rule{\linewidth}{1mm}\\[4ex]
+{\Huge\sf Symbolic execution of Python}\\[2ex]
+{\huge\sf Bjarke Bondo Andersen, 20096300}\\[2ex]
+\noindent\rule{\linewidth}{1mm}\\[4ex]
+\noindent{\Large\sf Project work, Computer Science\\[1ex] 
+\monthname\ \the\year  \\[1ex] Advisor: Anders Møller\\[15ex]}\\[\fill]}
+\clearpage
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pagestyle{plain}
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+\tableofcontents
+\pagenumbering{arabic}
+\setcounter{secnumdepth}{2}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Introduction}
+\label{ch:intro}
 
 Symbolic execution is a way to prove existence of errors in programs. 
+\todo{\dots}
 
-Symbolic values, constraint solving, etc.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section*{Goals}
+\chapter{Goals}
+\label{ch:goals}
+\todo{\dots}
 
-\section*{Overview}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\section*{Normalization}
+\chapter{Overview}
+\label{ch:overview}
+
+\begin{itemize}
+  \item \todo{Implementation strategy / general design decisions}
+  \item \todo{Report structure}
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Background}
+\label{ch:background}
+
+\section{DART/CUTE}
+\todo{\dots}
+
+\section{Apollo}
+\todo{\dots}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\chapter{Normalization}
+\label{ch:norm}
 
 We do a normalization in which statements and expressions are transformed into
 \emph{atomic actions}. For example, expressions are transformed into a single
@@ -26,7 +93,68 @@ tmp_2 = b * tmp_1
 \end{verbatim}
 and the expression \verb!a + tmp_2!
 
-\subsection*{Normalizing {\tt if-elif-else}}
+\section{Supported language}
+For now, only a subset of Python 3 is supported. This section will
+list supported/unsupported expression and statement AST nodes.
+\todo{This would probably be nicer to read this as a BNF}
+
+\subsection{Supported expressions}
+\begin{description}
+  \item[Var, Int, LongInt, Float, Imaginary, Bool, Tuple, List and
+    Set:] Literals of the obvious kind.
+  \item[None:] The \verb|None| literal.
+  \item[Ellipsis:] The \verb|Ellipsis| literal.
+  \item[ByteStrings, Strings and UnicodeStrings:] String literals.
+  \item[Call:] Function calls. This does not include method calls,
+    which are represented as a BinOp with operator Dot. This is also
+    supported, though.
+  \item[BinaryOp:] The application of a binary operator. Chained
+    comparisons are not supported yet.
+  \item[UnaryOp:] The application of a unary operator.
+  \item[Paren:] Parenthesized expressions.
+\end{description}
+
+\subsection{Unsupported expressions}
+\begin{description}
+  \item[Subscript:] Expressions like \verb|x[y]|.
+  \item[SlicedExpr:] Expressions like \verb|w[x:y:z]|.
+  \item[CondExpr:] \verb|if|-\verb|then|-\verb|else| expressions.
+  \item[Lambda:] Lambda expressions.
+  \item[Yield:] The \verb|Yield| operator.
+  \item[Generator:] Generators.
+  \item[Dictionary:] Dictionary literals.
+  \item[ListComp, DictComp and SetComp:] List, dictionary and set
+    comprehensions.
+  \item[Starred:] Expressions prefixed by a \verb|*|.
+\end{description}
+
+\subsection{Supported statements}
+\begin{description}
+  \item[Import and ImportFrom:] Import statements.
+  \item[While:] While loops. Only supported when the condition is a variable.
+  \item[For:] For loops.
+  \item[Fun:] Function declarations.
+  \item[Class:] Class declarations.
+  \item[Conditional:] \verb|if|-\verb|elif|-\verb|else| clains.
+  \item[Assign:] Normal assignment.
+  \item[AugmentedAssign:] Assignments like \verb|a += b|.
+  \item[Return, Pass, Break, Continue, Global, NonLocal and Assert:] Statements of the same name.
+  \item[StmtExpr:] Statements consisting of an expression.
+\end{description}
+
+\subsection{Unsupported statements}
+\begin{description}
+  \item[Decorated:] Decorated statements, i.e. a statement prefixed by \verb|@something|.
+  \item[Try:] \verb|try|-\verb|except|-\verb|finally| statements.
+  \item[Raise:] Raise an exception.
+  \item[With:] Automated resource handling.
+  \item[Delete:] Delete something, like the delete operator in
+    ECMAScript.
+  \item[Exec:] Compile and execute code on the fly, analogous to eval
+    in ECMAScript.
+\end{description}
+
+\section{Normalizing {\tt if-elif-else}}
 Assume we have a function $$simplifyToVariable: Expression \rightarrow
 [Statement] \times Variable$$ that transforms an arbitrary expression
 into a list of normalized statements, and a variable containing the
@@ -60,18 +188,19 @@ else
 \end{verbatim}
 and then recursing into the two branches.
 
-\subsection*{Normalizing $\lambda$-expressions}
+\section{Normalizing $\lambda$-expressions}
 All $\lambda$-expressions are transformed into named (local) functions. The body
 of the $\lambda$-expression is an expression, but when normalized it may require
 a number of preceding statements. Thus one cannot use a $\lambda$-expression.
+\todo{Not implemented yet}
 
-\subsection*{Normalizing {\tt while}}
+\section{Normalizing {\tt while}}
 We only have support for {\tt while} where the condition is a single
 variable. To support arbitrary conditions we would have to precede the
 whole {\tt while} statement and all matching inner {\tt continue}
 statements with the list of statements calculating the condition.
 
-\subsection*{Semantic deviation}
+\section{Semantic deviation}
 \paragraph{The short-circuit semantics of boolean operators are ignored;}
   instead expressions are always fully evaluated. This could be fixed
   at the cost of some output complexity, e.g. \verb|if a or b: S| should
@@ -83,12 +212,16 @@ if tmp_2: tmp_1 = b
 if tmp_1: S
 \end{verbatim}
 
-\subsection*{Experimental verification}
-Drop section?
+\section{Experimental verification}
+\todo{Run experiments with the unit tests from CPython, or if there's
+  not enough time, drop this section}
 
-\section*{Instrumentation}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection*{Source code transformation}
+\chapter{Instrumentation}
+\label{ch:instumentation}
+
+\section{Source code transformation}
 We instrumrnt the python code by inserting calls to our python
 instrumentation library into the source. For example, the program
 \begin{verbatim}
@@ -138,9 +271,9 @@ def foo(x):
     them be.
 \end{description}
 
-\subsection*{Execution}
+\section{Execution}
 
-\subsubsection*{Overview}
+\subsection{Overview}
 
 \begin{itemize}
 \item Inject functions into \verb|builtins|
@@ -149,7 +282,7 @@ def foo(x):
 \item It would be nice to add constraints that force division by zero
 \end{itemize}
 
-\subsubsection*{Example}
+\subsection{Example}
 
 Given that \verb|~/symbolic-execution/transformer/tests/pythagoras.py| contains
 \begin{verbatim}
@@ -202,7 +335,7 @@ us to completely rely on Z3's symbolic representation of values. This
 might change when we introduce symbolic type coercion and primitive
 types other than integers and booleans.
 
-\subsubsection*{Handeling path conditions}
+\subsection{Handeling path conditions}
 We store executed paths as a list of tuples containing
 $$(symbolic\_boolean\_condition, variable\_name, assert/refute)$$
 Notice that because of the normalization, an execution path is
@@ -220,45 +353,35 @@ def find_next_path():
     return path()
 \end{verbatim}
 
-\subsubsection*{Handeling symbolic environments}
+\subsection{Handeling symbolic environments}
 \begin{itemize}
 \item Naming arguments: Delay naming until inside the functions where
   the formals have names.
 \item Scoping
 \end{itemize}
 
-\section*{Related work}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\subsection*{DART}
-
-\subsection*{Apollo}
-
-\section*{Future work}
+\chapter{\todo{TODO}}
 
 \begin{itemize}
   \item Nice diagram explaining the normalization in detail.
-  \item Instrumentation of code
-  \item Library for symbolic execution
-  \item Introduction 
-  \item Experimental verification of our normalization
-  \item Sprinkle with examples! \textbackslash{}o/
-  \item \LaTeX{} stuff
-  \item Roadmap
-  \item Small test programs for experimental verification of the normalization
-  \item Test programs for the final symbolic execution test
+  \item BNF of supported language.
+  \item Experimental verification of our normalization.
 \end{itemize}
 
-\subsection*{\LaTeX{} stuff}
+\section{\LaTeX{} stuff}
 
 \begin{itemize}
   \item A nice environment for python program text.
-  \item Something something for examples.
+  \item Prettier examples.
 \end{itemize}
 
-\subsection*{Roadmap}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-TODO
+\chapter{Conclusion}
+\label{ch:conclusion}
+
+\todo{\dots}
 
 \end{document}
-
-

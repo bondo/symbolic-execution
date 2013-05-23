@@ -133,9 +133,9 @@ list supported/unsupported expression and statement AST nodes.
   \item[None:] The \verb|None| literal.
   \item[Ellipsis:] The \verb|Ellipsis| literal.
   \item[ByteStrings, Strings and UnicodeStrings:] String literals.
-  \item[Call:] Function calls. This does not include method calls,
-    which are represented as a BinaryOp with operator Dot. This is
-    also supported, though.
+  \item[Call:] Function calls and method invocations. Only ``normal''
+    parameter passing supported, no named arguments or unpacking of
+    lists and dictionaries.
   \item[BinaryOp:] The application of a binary operator. Chained
     comparisons are not supported yet.
   \item[UnaryOp:] The application of a unary operator.
@@ -157,23 +157,31 @@ list supported/unsupported expression and statement AST nodes.
 \end{description}
 
 \subsection{Supported statements}
-\todo{Check that all of these are actually completely supported}
 \begin{description}
   \item[Import and ImportFrom:] Import statements.
-  \item[While:] While loops. Only supported when the condition is a variable.
-  \item[For:] For loops.
-  \item[Fun:] Function declarations.
+  \item[While:] While loops. Only supported when the condition is a
+    variable.
+  \item[For:] For loops. Only supported when the target is a single
+    variable.
+  \item[Fun:] Function declarations. Only ``normal'' parameters,
+    possibly with default values, are supported, no var-args or
+    keyword dictionaries.
   \item[Class:] Class declarations.
   \item[Conditional:] \verb|if|-\verb|elif|-\verb|else| chains.
-  \item[Assign:] Normal assignment.
+  \item[Assign:] Normal assignment. Only a single left hand side is
+    supported.
   \item[AugmentedAssign:] Assignments like \verb|a += b|.
-  \item[Return, Pass, Break, Continue, Global, NonLocal and Assert:] Statements of the same name.
+  \item[Return, Pass, Break, Continue, Global and NonLocal:]
+    Statements of the same name.
+  \item[Assert:] An assert statement. Only a single condition is
+    supported.
   \item[StmtExpr:] Statements consisting of an expression.
 \end{description}
 
 \subsection{Unsupported statements}
 \begin{description}
-  \item[Decorated:] Decorated statements, i.e. a statement prefixed by \verb|@something|.
+  \item[Decorated:] Decorated statements, i.e. a statement prefixed by
+    \verb|@something|.
   \item[Try:] \verb|try|-\verb|except|-\verb|finally| statements.
   \item[Raise:] Raise an exception.
   \item[With:] Automated resource handling.

@@ -180,7 +180,7 @@ list supported/unsupported expression and statement AST nodes.
 
 \subsection{Unsupported statements}
 \begin{description}
-  \item[Decorated:] Decorated statements, i.e. a statement prefixed by
+  \item[Decorated:] Decorated statements, i.e. statements prefixed by
     \verb|@something|.
   \item[Try:] \verb|try|-\verb|except|-\verb|finally| statements.
   \item[Raise:] Raise an exception.
@@ -315,7 +315,60 @@ def foo(x):
 \end{description}
 
 \section{Supported language}
-\todo{\dots}
+Compared to the normalization phase, only a tiny language is
+supported. Not all of what the normalization can output is supported
+in this phase.
+
+By assumption, only statements needs to have accompanying
+instrumentation calls, and so this section only talks about supported
+and unsupported statements. Expressions on unsupported value types
+should be handled by the python library.
+
+\subsection{Supported statements}
+\begin{description}
+  \item[While:] The condition must be a single variable and there must
+    be no else branch. Supporting an else branch should be
+    straightforward.
+  \item[Fun:] Parameters must be names -- no default values and no
+    annotations. No annotations on the function itself either.
+  \item[Conditional:] \verb|if| statements with a variable as
+    condition, no \verb|elif| and possibly an \verb|else| branch. Note
+    that this is exactly what the normalization outputs.
+  \item[Assign:] Normal assignment, with a single variable on the left
+    hand side. The right hand side should be a literal, a function
+    call or a binary operation on two variables. This is consistent
+    with the output of the normalization phase.
+  \item[Return:] Return a variable or nothing. Consistent with
+    normalization.
+  \item[Pass, Break and Continue:] No instrumentation needed.
+  \item[StmtExpr:] Only supported when the expression is a function
+    call.
+\end{description}
+
+\subsection{Unsupported statements}
+\begin{description}
+  \item[Import and FromImport:] It probably would not demand any
+    instrumentation, so support should be straightforward.
+  \item[For:] It is not clear how the generator should be handled
+    symbolically.
+  \item[Class:] To handle classes well, we should be able to
+    instantiate their fields with primitive values, new instances or
+    old instances. We should then model their instances symbolically
+    and pass them as input values to the function under
+    test. \todo{Reference something -- either ``Symbolic PathFinder''
+      or ``Symbolic Execution for Software Testing in Practice''}
+  \item[AugmentedAssign:] Removed by normalization, so no need to
+    support.
+  \item[Decorated, Try, Raise, With and Delete:] Not supported in
+    normalization either.
+  \item[Global and NonLocal:] Support for these will especially be
+    demanding on the python side of things, where these statements
+    will complicate handling of scopes.
+  \item[Assert:] Should be straightforward, and useful, to implement.
+  \item[Exec:] Will likely be hard to implement with this
+    implementation strategy -- would have been straightforward in a
+    modified interpreter. \todo{Explain?}
+\end{description}
 
 \chapter{Symbolic execution}
 \label{ch:symbolic}

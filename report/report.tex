@@ -61,7 +61,7 @@ Symbolic execution is a way to prove existence of errors in programs.
   \item \todo{Find out about symbolic execution and how it can be
     applied to Python}
   \item \todo{See if this strategy of source level transformations is
-    a fruitful}
+    fruitful}
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -157,6 +157,7 @@ list supported/unsupported expression and statement AST nodes.
 \end{description}
 
 \subsection{Supported statements}
+\todo{Check that all of these are actually completely supported}
 \begin{description}
   \item[Import and ImportFrom:] Import statements.
   \item[While:] While loops. Only supported when the condition is a variable.
@@ -414,8 +415,8 @@ def find_next_path():
     the number of symbolic assertions made.
   \item Z3 can theoretically go into an infinite loop (under which
     conditions?), so set a timeout.
-  \item Implement function calls in the instrumentation, both for
-    local and foreign (library or external, not C) functions.
+  \item Implement function calls in the execution, both for local and
+    foreign (library or external) functions.
   \item Add instrumentation support for more types. First bool and
     floating point, then complex numbers, then tuples, then arrays and
     strings.
@@ -428,6 +429,8 @@ def find_next_path():
 
 \begin{itemize}
   \item A nice environment for python program text.
+  \item {\tt texttt} or \verb|verbatim| for inline Python? Any
+    difference?
   \item Prettier examples.
 \end{itemize}
 

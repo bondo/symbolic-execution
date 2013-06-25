@@ -11,6 +11,7 @@
 \usepackage{lmodern}
 \usepackage{color}
 \usepackage{datetime}
+\usepackage[numbers]{natbib}
 
 \renewcommand*\ttdefault{txtt}
 
@@ -23,7 +24,7 @@
 \pagestyle{empty} 
 \pagenumbering{roman} 
 \vspace*{\fill}\noindent{\rule{\linewidth}{1mm}\\[4ex]
-{\Huge\sf Symbolic execution of Python 3}\\[2ex]
+{\Huge\sf Symbolic execution of Python}\\[2ex]
 {\huge\sf Bjarke Bondo Andersen, 20096300}\\[2ex]
 \noindent\rule{\linewidth}{1mm}\\[4ex]
 \noindent{\Large\sf Project work, Computer Science\\[1ex] 
@@ -33,9 +34,9 @@
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \pagestyle{plain}
-\chapter*{Abstract}
-\addcontentsline{toc}{chapter}{Abstract}
-\todo{\dots}
+% \chapter*{Abstract}
+% \addcontentsline{toc}{chapter}{Abstract}
+
 
 \setcounter{tocdepth}{1}
 \tableofcontents
@@ -47,59 +48,212 @@
 \chapter{Introduction}
 \label{ch:intro}
 
-Symbolic execution is a way to prove existence of errors in programs.
+Symbolic execution can be thought of as being like random testing
+(running programs with random values to see if it's well behaved, in
+some sense), in that it's purpose is to discover program input that
+triggers unwanted behaviour. Another way to think of symbolic
+execution is as an alternative to static analysis that is
+under-approximating (finding only real errors) instead of
+over-approximating (finding all posible errors). \\
 
-\todo{Motivation: Dynamic languages are hard to analyze statically, as
-  far as we know no one has implemented symbolic execution for Python
-  before}
+In it's original, purest form, as presented in \cite{King:1976},
+symbolic execution is basically the idea that a function can be
+executed with {\it symbolic} instead of {\it concrete}
+values. 
 
-\section{Simple example}
-\todo{\dots}
+Instead of a concrete program state, we have a symbolic state,
+realized by keeping a map from program variables to symbolic values,
+in terms of the input parameters (e.g. $\{\texttt{a} \mapsto
+2\alpha-4, \texttt{b} \mapsto \beta\}$). Furthermore, a set of
+symbolic assertions are maintained, extended at each branch -- when
+going into the then branch, the branch condition is the assertion, and
+when going into the else branch, the negation of the branch condition
+is the assertion.
 
-\section{Project goals}
+When the maintained assertions are conjugated, the result is called
+the {\it path condition}, PC. The PC is a boolean expression,
+constraining the input parameters to sets of concrete values that
+would result in the same execution path. I.e. when the PC is
+satisfiable, the solution is a map from input parameters to concrete
+values that would follow exactly the same branching as the symbolic
+execution. When a PC is not satisfiable or cannot be handled by the
+constraint solver, that means we are unable to find an assignment of
+concrete values to the input parameters that would result in the same
+execution, and thus any further symbolic execution of the execution
+path in question is useless. If both branches are feasible, fork the
+symbolic execution and execute both. The PC is checked for
+satisfiability every time it changes, so if an error state in the unit
+under test is reached, the solution to the PC can be reported as a
+concrete example that provokes that error state. \\
+
+At the time it seemed hard to use the idea for any practical
+analysis. For one thing, constraint solving technology was far behind
+where we are today, making it both a lot slower and abel to deal only
+with much simpler constraints. This imposed severe restrictions on the
+allowed complexity of branching conditions, types of values, and
+number of possible execution paths that could be explored in a
+feasible time frame. Also, some constraints are simply unsolvable and
+some parts of a concrete execution might be unavailable for symbolic
+execution (e.g. RPC to a closed third-party server). \\
+
+In \citeyear{DART} the paper \cite{DART} was published, which resulted
+in a new serge of research in symbolic execution \cite{EXE,CUTE}. In
+the paper, \citeauthor*{DART} shows that combining concrete and
+symbolic execution can dramatically increase the overall efficiency by
+substituting concrete for abstract values, thus simplifying hard or
+unsolvable constraints. This means possibly sacrificing some
+precision, but it solves a great many problems with the earlier
+approach \cite{Cadar:2013}.
+
+
+\section{Project}
+
+Symbolic execution is typically targeted statically typed languages --
+as far as the author knows \cite{Apollo}, which targets PHP, is
+the only published exception. The dynamic nature of PHP is not much
+explored in Apollo though, in the sense that program input is always
+an HTTP request.
+
+This, along with other language features and it's mainstraim
+popularity, makes Python an intesting target language for symbolic
+execution. \\
+
+The project that this report documents has three goals:
 \begin{itemize}
-  \item \todo{Find out about symbolic execution and how it can be
-    applied to Python}
-  \item \todo{See if this strategy of source level transformations is
-    fruitful}
+  \item To learn in general about symbolic execution.
+  \item To find symbolic execution techniques applicable to Python.
+  \item To find out if making source level transformations in order to
+    automatically integrate the unit under test into a driver
+    framework is a good strategy for implementing symbolic execution
+    for Python.
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{Overview}
-\label{ch:overview}
+\section{Overview}
 
-\begin{itemize}
-  \item \todo{Implementation strategy / general design decisions}
-  \item \todo{Diagram explaining how the different program components
-    fit together}
-  \item \todo{Link to GitHub}
-  \item \todo{Report structure}
-  \item \todo{We started out by implementing an interpreter...}
-\end{itemize}
+As we suspected that making source level transformations might yield
+the most bang for the buck, as opposed to building or modifying a
+Python interpreter, to explore this idea became one of the project
+goals.
 
-The normalization and the insertion of instrumentation code is
-implemented in Haskell \todo{Why?}. We use the \verb|Language.Python|
-package to parse and pretty-print Python code.
+This section will outline the implementation strategy on a high level,
+followed by an joutline of the rest of the report.
 
-For the actual symbolic execution, we have written a library/wrapper
-in Python. We use Microsoft's SMT solver Z3 to solve constraints,
-because it has a simple Python interface and can handle quite complex
-constraints.
+\subsection{Implementation strategy}
 
+When a Python function is chosen as the unit under test, it goes
+through three phases:
+\begin{description}
+  \item[Normalization:] First the function is normalized,
+    i.e.\ the code is transformed so that each statement and
+    expression type is as simple and consistent as possible.
+  \item[Instrumentation:] Then, the function is again transformed,
+    this time inserting calls to a Python framework at every place
+    where control needs to be transfered and information needs to be
+    conveyed.
+  \item[Execution:] The Python framework executes the chosen
+    function. All the logic for doing concolic execution exists in
+    this framework.
+\end{enumerate}
+The normalization and the instrumentation phases are implemented in
+Haskell. We use the \verb|Language.Python| package to parse and
+pretty-print Python code, and thus we only have to be concerned with
+the AST.
 
+We use Microsoft's SMT solver Z3 to solve constraints, because it has
+a simple Python interface and can handle quite complex constraints.
 
+\subsection{Outline}
+
+In chapter \ref{ch:background}, we review some of the important,
+relevant papers. Chapter \ref{ch:norm} describes the first
+transformation phase, where the unit under test is normalized, so as
+to reduce the number of cases to handle later on. Chapter
+\ref{ch:instrumentation} describes the second transformation phase,
+where calls to our Python framework are inserted. The Python framework
+is described in chapter \ref{ch:symbolic}, while some of the things
+that would have been in the framework, had there been more time, are
+listed in chapter \ref{ch:future}. Chapter \ref{ch:conclusion}
+concludes.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Background}
 \label{ch:background}
 
-\section{DART/CUTE}
-\todo{\dots}
+This chapter will review two papers that are relevant to the project.
 
-\section{Apollo}
-\todo{\dots}
+The first paper, \cite{DART}, was the one that rebooted the interest
+in symbolic execution by mixing in concrete execution, resulting in
+what came to be known as {\it concolic} execution after the term was
+coined in \cite{CUTE}.
+
+The second paper, \cite{Apollo}, is as far as the author knows the the
+only published tool for symbolic execution of a dynamically typed
+language, PHP.
+
+\section{\citet{DART}}
+
+The paper presents the tool DART ({\it Directed Automated Random
+  Testing}), which was a major breakthrough in the practical
+usefulness of symbolic execution techniques. The primary innovation
+was to automatically generate random concrete values satisfying a
+given PC, and use these concrete values to simultaneously have a
+concrete and symbolic state. This allowed the execution to continue
+when the constraints went outside the constraint theory.
+
+DART targets C, and basically works as follows: First, all input
+parameters are initialized to random values. Then statements are
+executed one at a time, each time executing the statement twice --
+once symbolically and once concretely. If the statement in question is
+an \verb|if| statement, there are two cases:
+\begin{enumerate}
+  \item If the condition is integer linear, calculate it's concrete
+    value. Then, if the condition is true, add the symbolic value of
+    the condition to the PC. Otherwise, add the negation of the
+    symbolic value of the condition to the PC. Also, register that the
+    new PC has been seen before.
+  \item If the condition is {\it not} integer linear, simply follow
+    the concrete value of the condition and leave the PC alone.
+\end{enumerate}
+If sone error occurs, or the program simply terminates, report the
+error and find the next path condition to pursue. That is done by
+removing the latest assertion as long as both that and it's negation
+have been seen. If the PC is now empty, there are no more paths to
+explore. Otherwise negating the last assertion, and feed the resulting
+PC to the constraint solver. Continue this process untill the PC is
+solvable, then restart the program with the PC solution as the input
+parameters.
+
+In the end, the lesson from DART is that when symbolic values become
+to hard to work with, we can simply fall back on the concrete values.
+
+\section{\citet{Apollo}}
+
+This paper is farily recent (\citeyear{Apollo}), and thus somewhat
+more sophisticated techniques are used. The accompanying tool as
+called Apollo, and is build as a modification to an existing PHP
+interpreter.
+
+The basic idea is the same, i.e.\ Apollo is a concolic execution
+tool. Because the target is PHP, used as a HTML generation tool, the
+program input is a sequence HTTP request, representing a session of
+user interaction, and the result for each request is a HTML
+document. This presents a unique challenge -- the input HTTP requests
+has to be build to reflect possible cases w.r.t.\ the intermediate
+HTML results. This means the HTML has to be parsed, and so it only
+natural require valid documents. Invalid documents are reported as
+program errors, along with the input sequence that resulted in the
+offending document. 
+
+Many errors states can be reached through several execution paths, so
+in order to minimize duplication and remove ``noise'' from the output,
+a path constraint minimization algorithm is used. The algorithm
+systimatically bulks together similar errors. When a bulk is found
+where the intersection of the contained PCs is regarded as that bulks
+PC, and if that PC still results in the same error, the bulk is kept
+and the PC is minimized.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -110,7 +264,7 @@ We do a normalization in which statements and expressions are
 transformed into \emph{atomic actions}. For example, expressions are
 transformed into a single action on local variables and a list of
 statements that assign the value of the subexpressions into
-corresponding variables. \todo{Elaborate}
+corresponding variables.
 
 Example: \verb!a + b * 4! is transformed into the following list of
 preceding statements
@@ -123,7 +277,6 @@ and the expression \verb!a + tmp_2!
 \section{Supported language}
 For now, only a subset of Python 3 is supported. This section will
 list supported/unsupported expression and statement AST nodes.
-\todo{This would probably be nicer to read as a BNF}
 
 \subsection{Supported expressions}
 \begin{description}
@@ -135,10 +288,13 @@ list supported/unsupported expression and statement AST nodes.
   \item[ByteStrings, Strings and UnicodeStrings:] String literals.
   \item[Call:] Function calls and method invocations. Only ``normal''
     parameter passing supported, no named arguments or unpacking of
-    lists and dictionaries.
+    lists and dictionaries. After normalization all arguments are
+    variables.
   \item[BinaryOp:] The application of a binary operator. Chained
-    comparisons are not supported yet.
-  \item[UnaryOp:] The application of a unary operator.
+    comparisons are not supported yet. After normalization both sides
+    of the BinaryOp are variables.
+  \item[UnaryOp:] The application of a unary operator. After
+    normalization the expression in the UnaryOp is a variable.
   \item[Paren:] Parenthesized expressions.
 \end{description}
 
@@ -162,6 +318,7 @@ list supported/unsupported expression and statement AST nodes.
   \item[While:] While loops. Only supported when the condition is a
     variable.
   \item[For:] For loops. Only supported when the target is a single
+    variable. After normalization the generator expression is also a
     variable.
   \item[Fun:] Function declarations. Only ``normal'' parameters,
     possibly with default values, are supported, no var-args or
@@ -169,13 +326,17 @@ list supported/unsupported expression and statement AST nodes.
   \item[Class:] Class declarations.
   \item[Conditional:] \verb|if|-\verb|elif|-\verb|else| chains.
   \item[Assign:] Normal assignment. Only a single left hand side is
-    supported.
-  \item[AugmentedAssign:] Assignments like \verb|a += b|.
+    supported. After normalization the right hand side is a literal, a
+    function call or the application of a binary or unary operator.
+  \item[AugmentedAssign:] Assignments like \verb|a += b|. After
+    normalization this becomes an Assign node.
   \item[Return, Pass, Break, Continue, Global and NonLocal:]
-    Statements of the same name.
+    Statements of the same name. After normalization either nothing or
+    a variable is returned.
   \item[Assert:] An assert statement. Only a single condition is
-    supported.
-  \item[StmtExpr:] Statements consisting of an expression.
+    supported. After normalization the argument is a variable.
+  \item[StmtExpr:] Statements consisting of an expression. The
+    expression is normalized as any other.
 \end{description}
 
 \subsection{Unsupported statements}
@@ -226,10 +387,12 @@ else
 and then recursing into the two branches.
 
 \section{Normalizing $\lambda$-expressions}
-All $\lambda$-expressions are transformed into named (local) functions. The body
-of the $\lambda$-expression is an expression, but when normalized it may require
-a number of preceding statements. Thus one cannot use a $\lambda$-expression.
-\todo{Not implemented yet}
+All $\lambda$-expressions should be transformed into named (local)
+functions. The body of a $\lambda$-expression is an expression, but
+when normalized it may require a number of preceding statements. Thus
+one cannot use a $\lambda$-expression as the result of a normalized
+$\lambda$-expression. $\lambda$-expressions are not currently
+supported, but should be fairly easy.
 
 \section{Normalizing {\tt while}}
 We only have support for {\tt while} where the condition is a single
@@ -249,17 +412,13 @@ if tmp_2: tmp_1 = b
 if tmp_1: S
 \end{verbatim}
 
-\section{Experimental verification}
-\todo{Run experiments with the unit tests from CPython, or if there's
-  not enough time, drop this section}
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Instrumentation}
-\label{ch:instumentation}
+\label{ch:instrumentation}
 
-We instrument the python code by inserting calls to our python
-library into the source.
+We instrument the python code by inserting calls to our Python
+framework into the source.
 
 Example: The program
 \begin{verbatim}
@@ -285,10 +444,8 @@ def foo(x):
     return tmp_2
 \end{verbatim}
 
-\todo{Add example with branching}
-
 \section{Transformations}
-\todo{What is this}
+Statements are transformed like this:
 
 \begin{description}
   \item[Functions:] A call to {\tt symbolic\_scope} is inserted as the
@@ -322,7 +479,7 @@ in this phase.
 By assumption, only statements needs to have accompanying
 instrumentation calls, and so this section only talks about supported
 and unsupported statements. Expressions on unsupported value types
-should be handled by the python library.
+should be handled by the Python framework.
 
 \subsection{Supported statements}
 \begin{description}
@@ -355,34 +512,55 @@ should be handled by the python library.
     instantiate their fields with primitive values, new instances or
     old instances. We should then model their instances symbolically
     and pass them as input values to the function under
-    test. \todo{Reference something -- either ``Symbolic PathFinder''
-      or ``Symbolic Execution for Software Testing in Practice''}
+    test. \cite{Pasareanu:2010}
   \item[AugmentedAssign:] Removed by normalization, so no need to
     support.
   \item[Decorated, Try, Raise, With and Delete:] Not supported in
     normalization either.
   \item[Global and NonLocal:] Support for these will especially be
-    demanding on the python side of things, where these statements
+    demanding on the Python side of things, where these statements
     will complicate handling of scopes.
   \item[Assert:] Should be straightforward, and useful, to implement.
   \item[Exec:] Will likely be hard to implement with this
     implementation strategy -- would have been straightforward in a
-    modified interpreter. \todo{Explain?}
+    modified interpreter.
 \end{description}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \chapter{Symbolic execution}
 \label{ch:symbolic}
 
-\section{Overview}
+The Python framework for the actual symbolic execution is actually
+fairly simple, mainly because of the extremely simple Python interface
+of the constraint solver, Z3, which actually represents values as ASTs
+of symbolic values.
 
+We then inject functions (\verb|symbolic_scope|, \verb|symbolic_assert|,
+etc.) into \texttt{builtins}, so they can be called from the client
+code without us having to change the imports.
+
+And finally we can invoke the unit under test, and wait for it to
+finish or throw an exception (which is the only kind of errors we
+recognize).
+
+\section{Parameter types}
+For now, the framework only supports integers. But if more types were
+to be added, how should the types of the input parameters be chosen?
+Several possibilities springs to mind:
 \begin{itemize}
-\item \todo{Inject functions into \verb|builtins|}
-\item \todo{Invoke the code under test from \verb|instrument.py|}
-\item \todo{Assume all errors are uncaught exceptions}
-\item \todo{Ideally, how would we choose the types of input
-  parameters? By adding some sort of type constraints? By trying every
-  combination? By having the user specify the types to test?}
+  \item Have the user specify the types
+  \item Try every combination of types
+  \item Add constraints describing the type of inputs when code where
+    the type matters is run.
 \end{itemize}
+The last of these possibilities seems to be the most in the spirit of
+symbolic execution, but the first one will likely be sufficient for
+many situations, specially if a list of types could be specified for
+each parameter so combinations of these could be brute forced.
+
+As far as the author can tell, this is new ground, so some exploration
+before setteling on something could well be beneficial.
 
 \section{Example}
 
@@ -437,7 +615,7 @@ right. When assigning an integer constant as a symbolic value, we
 instead assign the variable with that integer as the name. This allows
 us to completely rely on Z3's symbolic representation of values. This
 might change when we introduce symbolic type coercion and primitive
-types other than integers and booleans. \todo{Explain output more?}
+types other than integers and booleans.
 
 \section{Handling path conditions}
 We store executed paths as a list of tuples containing \\
@@ -445,7 +623,7 @@ We store executed paths as a list of tuples containing \\
 
 Notice that because of the normalization, an execution path is
 uniquely determined by the reduced list of \verb|(name, is_assert)|
-tuples. \todo{Why?}
+tuples.
 
 We find the next path to explore by this algorithm:
 \begin{verbatim}
@@ -458,44 +636,32 @@ def find_next_path():
     return path()
 \end{verbatim}
 
-\todo{A few words about the algorithm}
-
-\section{Handling symbolic environments}
-\begin{itemize}
-\item \todo{Naming arguments: Delay naming until inside the functions
-  where the formals have names. Why name stuff?}
-\item \todo{Scoping?}
-\end{itemize}
-
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-\chapter{\todo{TODO}}
+\chapter{Future work}
+\label{ch:future}
+
+This is list of code related things that the author never got around
+to:
 
 \begin{itemize}
-  \item Nice diagram explaining the normalization in detail.
-  \item BNF of supported language. Both for the normalization and the
-    instrumentation phase.
   \item Bound execution of client code, either with a timeout or by
     the number of symbolic assertions made.
   \item Z3 can theoretically go into an infinite loop (under which
     conditions?), so set a timeout.
   \item Implement function calls in the execution, both for local and
     foreign (library or external) functions.
-  \item Add instrumentation support for more types. First bool and
-    floating point, then complex numbers, then tuples, then arrays and
-    strings.
   \item Fall back on concrete values when Z3 fails.
   \item It would be nice to add constraints that force division by
-    zero when possible.
-\end{itemize}
-
-\section{\LaTeX{} stuff}
-
-\begin{itemize}
-  \item A nice environment for python program text.
-  \item {\tt texttt} or \verb|verbatim| for inline Python? Any
-    difference?
-  \item Prettier examples.
+    zero and other such errors when possible.
+  \item Add instrumentation support for more types. First bool and
+    floating point, then complex numbers, then tuples, then arrays,
+    strings and arbitrary classes.
+  \item Generally add support for more of Python.
+  \item Add support for more types and experiment with ways to
+    determain with witch types to initialize input parameters.
+  \item Run tests to ensure the transformations are semantics
+    preserving.
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -503,11 +669,19 @@ def find_next_path():
 \chapter{Conclusion}
 \label{ch:conclusion}
 
-\begin{itemize}
-\item \todo{Symbolic execution can be an efficient way of finding (a
-  certain class of) bugs, along with ways to reproduce them}
-\item \todo{Full python support would probably be more feasible if
-  symbolic execution was implemented as a modified interpreter}
-\end{itemize}
+Symbolic execution has come a long way in recent years, and seems to
+finally have the potential to help find a lot of bugs in real world
+applications. But although many new tricks have been found since it
+sprang back into life, it still feels like there is much to explore.
+
+In the complexity and flexibility of Python, some features of the
+language seems fairly hard to implement with the current strategy of
+source code transformations. Maybe extending an existing interpreter
+would be a shorter path to full Python support.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\bibliographystyle{plainnat}
+\bibliography{report}
 
 \end{document}
